@@ -3,7 +3,7 @@ MilkPack
 
 Homepage
 --------
-http://sites.google.com/site/edgargoncalves/work/software/milkpack
+[http://sites.google.com/site/edgargoncalves/work/software/milkpack](http://sites.google.com/site/edgargoncalves/work/software/milkpack ) 
 
 About it...
 -----------
@@ -19,12 +19,12 @@ How do I get its source to compile and make my own MilkPack build?
 ------------------------------------------------------------------
 So you've got to the point that you tried Milkpack, didn't like something, talked to me about it, got a less than satisfactory reply, got angry and thought "hey, i can do it better myself!". Don't worry, that's probably not that hard :). And it is also a good sign. So pack your things, and get ready for the open source ride:
 
-	1. Fetch the code, using git: http://github.com/edgargoncalves/MilkPack
-	2. Install the latest Clozure CL (see their site for details on this procedure, if you run into trouble):
-	3. Make sure you have XCode. You'll need to install 10.4 support for Clozure CL to run properly, and you'll need InterfaceBuilder.
-	4. Read the code, make changes, mess arround.
-	5. To build it, see the MilkPack.lisp header, and follow the instructions.
-	6. Good luck, email me if you run into any problem. I'm on the ascending part of the learning curve, but I'm sure I'll come up with some advice.
+1. Fetch the code, using git: http://github.com/edgargoncalves/MilkPack
+2. Install the latest Clozure CL (see their site for details on this procedure, if you run into trouble):
+3. Make sure you have XCode. You'll need to install 10.4 support for Clozure CL to run properly, and you'll need InterfaceBuilder.
+4. Read the code, make changes, mess arround.
+5. To build it, see the MilkPack.lisp header, and follow the instructions.
+6. Good luck, email me if you run into any problem. I'm on the ascending part of the learning curve, but I'm sure I'll come up with some advice.
 
 To build the final application, until I make a nice script for it, you can execute the following line:
 	$ open MilkPack.lisp -a /Applications/ccl/Clozure\ CL64.app
@@ -39,7 +39,8 @@ In time I'd like to learn enough about Cocoa to produce a simple/fast interface 
 I like/hate MilkPack so much, I feel like helping. What can I do?
 -----------------------------------------------------------------
 Pick one or more from the following:
-	* Collaborate, provide patches, talk to me about it. Every feedback is good!
-	* Are you a design-oriented person? Great - I'm not! :) Contribute with icons, backgrounds, a logo, and every design conceptual idea you think it's appropriate.
-	* Promote this app on your circle of influence. The more people use it, the more Milkpack can learn and grow. (Help me help you!)
-	* This application is going to stay free and open source. That said, I accept donations, specially if they include drinks and/or other sorts of social entertainment. But I'll also accept financial contributions, don't want to make anybody angry! :) See homepage for a Paypal donation button.
+
+- Collaborate, provide patches, talk to me about it. Every feedback is good!
+- Are you a design-oriented person? Great - I'm not! :) Contribute with icons, backgrounds, a logo, and every design conceptual idea you think it's appropriate.
+- Promote this app on your circle of influence. The more people use it, the more Milkpack can learn and grow. (Help me help you!)
+- This application is going to stay free and open source. That said, I accept donations, specially if they include drinks and/or other sorts of social entertainment. But I'll also accept financial contributions, don't want to make anybody angry! :) See homepage for a Paypal donation button.
