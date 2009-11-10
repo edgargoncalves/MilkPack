@@ -90,7 +90,7 @@
 (def-ibaction #/viewMap:   task-details-controller
   ;; Open small pane with webview on google maps, correctly placed.
   (declare (special *currently-selected-task*))
-  (format t "TODO - viewMap: ~s~%" (rtm::get-location *currently-selected-task*))
+  ;; (format t "TODO - viewMap: ~s~%" (rtm::get-location *currently-selected-task*))
   (ccl::run-program "open" (list "http://maps.google.com")))
 
 (def-ibaction #/goToLink:  task-details-controller
@@ -151,7 +151,7 @@
 
 
 #|
-Copyright [2009] [Edgar Gonçalves]
+Copyright 2009 Edgar Gonçalves
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.

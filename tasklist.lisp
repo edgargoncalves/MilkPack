@@ -22,7 +22,7 @@
     	(cond ((or (null (rtm-instance self))
 		   (%null-ptr-p (rtm-instance self))
 		   (null (rtm-user-info (rtm-instance self))))
-	       	 (format t "woooo, table is none")
+	       	 ;; (format t "woooo, table is none")
 	       #@"Nothing")
 	      ((eql table-view (contacts-table-view self))
 	       (compute-column-value '(("fullname" . rtm-lisp-api::get-fullname)
@@ -97,7 +97,7 @@
 
 
 #|
-Copyright [2009] [Edgar Gonçalves]
+Copyright 2009 Edgar Gonçalves
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.

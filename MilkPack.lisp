@@ -21,7 +21,8 @@
 
 (in-package #:irtm)
 
-(defconstant  PROJECT-SOURCE-PATH "~/Documents/projects/MilkPack/")
+(defconstant  PROJECT-NAME "MilkPack")
+(defconstant  PROJECT-SOURCE-PATH (concatenate 'string "~/Documents/projects/" PROJECT-NAME "/"))
 
 (defvar  RTM-API-KEY-PATH "~/rtm-api.lisp"
   "Path to a lisp file that sets the api key and shared secret variables on the `RTM-LISP-API' package. The file must contain the following s-expressions (values are lisp strings):
@@ -54,22 +55,19 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Code to build the MilkPack application bundle in MacOS:
 
-;; #|
-
 (setf (current-directory) PROJECT-SOURCE-PATH)
 (require "build-application")
 
 
-(ccl::build-application :name "MilkPack"
-                        :main-nib-name "MilkPack"
-                        :nibfiles 
-  '((format nil "~a/MilkPack.nib" PROJECT-SOURCE-PATH)))
-
-
-;; |#
+(ccl::build-application
+ :name PROJECT-NAME
+ :main-nib-name PROJECT-NAME
+ :copy-ide-resources nil
+ :altconsole nil ;; set to t if you need debug
+ :nibfiles '("~/Documents/projects/Milkpack/resources/Milkpack.nib"))
 
 #|
-Copyright [2009] [Edgar Gonçalves]
+Copyright 2009 Edgar Gonçalves
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.

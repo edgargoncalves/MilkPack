@@ -39,43 +39,43 @@
   (ccl::run-program "open" (list (rtm:rtm-api-build-auth-url)))
   "ok")
 
-(defun proceed-with-authorization ()
+(defun proceed-with-authorization (&optional second-time-p)
   (let ((frob-default-value (get-default-string #@"FrobKey")))
     ;; If we have non-empty frob and token, check the token.
     (if (string= frob-default-value "")
-	;; Request a new frob and token.
+	;; Produces a new frob and requests a new token.
 	(progn
-	  ;; (format t "Opening an authorization webpage... and getting a new FROB!~%")
+	  (gui::alert-window :title "MilkPack System Settings"
+			     :message "You need to authorize RTM to give access to MilkPack. Continue to go to a browser and do that, then come back here.")
 	  (request-rtm-authorization) ;; sets a new frob!
+	  (gui::alert-window :title "MilkPack System Settings"
+			     :message "Your browser should be asking you now for authorization to use RTM. Press OK when that's done.")
 	  ;;Set default frob.
 	  (set-default-value #@"FrobKey" (make-nsstring rtm:*rtm-api-current-frob*))
 	  (set-default-value #@"TokenKey" (make-nsstring ""))
 	  (setf rtm:*rtm-api-token* "")
-	  "Please click on proceed to finish authorization.")
+	  (proceed-with-authorization))
+	;; We have a frob. Let's see about the token:
 	(let ((token-default-value (get-default-string #@"TokenKey")))
 	  (setf rtm:*rtm-api-current-frob* frob-default-value)
-	  ;; If we have a token, check it. else, get a new one.
-	  (if (string= token-default-value "")
-	      (handler-case
+	  (handler-case
+	      ;; If we have a token, check it. else, get a new one.
+	      (if (string= token-default-value "")
 		  (progn
-		    ;; (format t "PROCEED-WITH-AUTHORIZATION: getting token using frob: ~s~%" rtm:*rtm-api-current-frob*)
+		    ;; We got a new token. Proceed with it safely.
 		    (rtm:rtm-api-get-token)
-		    (set-default-value #@"TokenKey" (make-nsstring rtm:*rtm-api-token*))
-		    "You may proceed, got a new token.")
-		(error  (condition)
-		  (set-default-value #@"FrobKey" (make-nsstring ""))
-		  (format t "RTM returned an error when getting token: ~s~%" condition)
-		  (proceed-with-authorization)))
-	      (handler-case
+		    (set-default-value #@"TokenKey" (make-nsstring rtm:*rtm-api-token*)))
 		  (progn
-		    ;; (format t "PROCEED-WITH-AUTHORIZATION: checking token using frob: ~s~%" frob-default-value)
+		    ;; We already have a valid token. Proceed using it.
 		    (setf rtm:*rtm-api-token* token-default-value)
 		    (rtm:rtm-api-check-token)
-		    (set-default-value #@"TokenKey" (make-nsstring rtm:*rtm-api-token*))
-		    "You may proceed, using the old token.")
-		(error  (condition)
-		  (set-default-value #@"FrobKey" (make-nsstring ""))
-		  (format t "RTM returned an error when checking token: ~s~%" condition)
+		    (set-default-value #@"TokenKey" (make-nsstring rtm:*rtm-api-token*))))
+	    (error  (condition)
+	      ;; The frob isn't valid, so let's get us a brand new token.
+	      (set-default-value #@"FrobKey" (make-nsstring ""))
+	      (if second-time-p
+		  (gui::alert-window :title "MilkPack RTM Error"
+				     :message (format nil "RTM returned an error message: ~a" condition))
 		  (proceed-with-authorization))))))))
 
 
@@ -98,14 +98,25 @@
     (setf (rtm-user-info self) (rtm::init-rtm))
     output))
 
-(defvar *settings-file-name* "rtm-data.txt")
+(defconstant SETTINGS-FILE-NAME "rtm-data.txt")
+
+(defun get-settings-file-name ()
+  (declare (special SETTINGS-FILE-NAME))
+  (let* ((preferences-path (make-lisp-string
+			    (#/objectAtIndex:
+			     (#_NSSearchPathForDirectoriesInDomains #$NSApplicationSupportDirectory
+								    #$NSLocalDomainMask
+								    #$YES)
+			     0))))
+    (format nil "~a/~a/~a" preferences-path PROJECT-NAME SETTINGS-FILE-NAME)))
+
+(defun get-bundle-path ()
+  (let* ((main-bundle (#/mainBundle ns:ns-bundle)))
+    (make-lisp-string (#/resourcePath main-bundle))))
 
 (defun save-app-data (rtm-instance)
-  (declare (special *settings-file-name*))
-  (let* ((rtm-data rtm::*rtm-user-info*)
-	 (main-bundle (#/mainBundle ns:ns-bundle))
-	 (resource-path (make-lisp-string (#/resourcePath main-bundle)))
-	 (data-pathname (concatenate 'string resource-path "/" *settings-file-name*)))
+  (let ((rtm-data rtm::*rtm-user-info*)
+	(data-pathname (get-settings-file-name)))
     ;; compile lisp file with data object contents
     (cl-store:store rtm-data data-pathname)
     ;;set internal object
@@ -121,10 +132,8 @@
   (save-app-data self))
 
 (objc:defmethod (#/loadDataFromDefaults :void) ((self rtm))
-  (declare (special rtm::*rtm-user-info* *settings-file-name*))
-  (let* ((main-bundle (#/mainBundle ns:ns-bundle))
-	 (resource-path (make-lisp-string (#/resourcePath main-bundle)))
-	 (data-pathname (concatenate 'string resource-path "/" *settings-file-name*)))
+  (declare (special rtm::*rtm-user-info*))
+  (let* ((data-pathname (get-settings-file-name)))
 
     ;;load byte-compiled file and restore the variable contents into rtm-data:
     (handler-case (let ((rtm-data (cl-store:restore data-pathname)))
@@ -144,7 +153,7 @@
 
 
 #|
-Copyright [2009] [Edgar Gonçalves]
+Copyright 2009 Edgar Gonçalves
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
