@@ -47,7 +47,12 @@
 	(progn
 	  (gui::alert-window :title "MilkPack System Settings"
 			     :message "You need to authorize RTM to give access to MilkPack. Continue to go to a browser and do that, then come back here.")
-	  (request-rtm-authorization) ;; sets a new frob!
+	  (handler-case
+	      (request-rtm-authorization) ;; sets a new frob!
+	    (error (condition) ;; frob is invalid!
+	      (set-default-value #@"FrobKey" (make-nsstring ""))
+	      ;; TODO: quit everything...
+	      (proceed-with-authorization)))
 	  (gui::alert-window :title "MilkPack System Settings"
 			     :message "Your browser should be asking you now for authorization to use RTM. Press OK when that's done.")
 	  ;;Set default frob.
@@ -76,7 +81,7 @@
 	      (if second-time-p
 		  (gui::alert-window :title "MilkPack RTM Error"
 				     :message (format nil "RTM returned an error message: ~a" condition))
-		  (proceed-with-authorization))))))))
+		  (proceed-with-authorization t))))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
