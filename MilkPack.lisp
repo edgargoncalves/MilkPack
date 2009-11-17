@@ -63,8 +63,8 @@
  :name PROJECT-NAME
  :main-nib-name PROJECT-NAME
  :copy-ide-resources nil
- :altconsole nil ;; set to t if you need debug
- :nibfiles '("~/Documents/projects/Milkpack/resources/Milkpack.nib"))
+ ;; :altconsole nil ;; comment if you need debug
+ :nibfiles (list (concatenate 'string PROJECT-SOURCE-PATH "resources/Milkpack.nib")))
 
 #|
 Copyright 2009 Edgar Gonçalves

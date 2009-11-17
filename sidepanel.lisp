@@ -161,12 +161,20 @@
 (objc:defmethod (#/outlineView:willDisplayCell:forTableColumn:item: :void)
     ((self sidepanel-controller) outline-view cell table-column item)
   (declare (ignore table-column outline-view))
-  (when (typep item 'ns:ns-mutable-array)
+  (when (and (not (%null-ptr-p cell))
+	     (typep item 'ns:ns-string)) ;; it's a list name
+    ;; TODO: memoize image:
+    ;; TODO: get image according to group type
+    (setf (image cell) (#/imageNamed: (find-class 'ns:ns-image) #@"note.png"))
+    (setf (text cell) item))
+  (when (typep item 'ns:ns-mutable-array) ;; It's a group name
     (let ((new-title (#/mutableCopy (#/attributedStringValue cell))))
       (#/replaceCharactersInRange:withString: new-title
 					      (ns:make-ns-range 0 (#/length new-title))
 					      (#/uppercaseString (#/string new-title)))
       (#/setAttributedStringValue: cell new-title)
+      (setf (image cell) +null-ptr+)
+      (setf (text cell) item)
       (#/release new-title))))
 
 ;; Make groups unselectable:
@@ -197,6 +205,7 @@
 	      (setf *currently-selected-task-list* it)
 	      (setf (get-current-tasks rtm-instance) (get-current-tasks-filtered-and-sorted))))))
       (#/reloadData (tasks-table-view *rtm-controller*)))))
+
 
 ;;; End of side panel implementation
 

@@ -49,9 +49,11 @@
 			     :message "You need to authorize RTM to give access to MilkPack. Continue to go to a browser and do that, then come back here.")
 	  (handler-case
 	      (request-rtm-authorization) ;; sets a new frob!
-	    (error (condition) ;; frob is invalid!
+	    (error () ;; frob is invalid!
 	      (set-default-value #@"FrobKey" (make-nsstring ""))
-	      ;; TODO: quit everything...
+	      ;; TODO: quit everything... using #/terminate: on the nsapplication.
+	      (gui::alert-window :title "MilkPack Authentication Error"
+			     :message "RTM didn't give access to MilkPack (are you offline?). Press OK to quit this app, try again when later.")
 	      (proceed-with-authorization)))
 	  (gui::alert-window :title "MilkPack System Settings"
 			     :message "Your browser should be asking you now for authorization to use RTM. Press OK when that's done.")

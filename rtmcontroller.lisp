@@ -27,6 +27,7 @@
 ;;; load ui parts controller functions.
 
 (load-module "tasklist.lisp")
+(load-module "sidebar-custom-cell.lisp")
 (load-module "sidepanel.lisp")
 (load-module "addtask.lisp")
 (load-module "addlist.lisp")
@@ -56,10 +57,12 @@
   (setf *rtm-controller* self))
 
 
+
 (objc:defmethod (#/applicationDidFinishLaunching: :void)
     ((self gui::lisp-application-delegate) notification)
   (declare (ignore notification))
-  (declare (special *rtm-controller*))
+  (declare (special *rtm-controller*))  
+  
   (#/loadDataFromDefaults: *rtm-controller* nil)
   ;; Assign a double-click action:
   (#/setDoubleAction: (tasks-table-view *rtm-controller*)
@@ -86,6 +89,10 @@
       (#/reloadData tasks-table))
     (unless (%null-ptr-p sidepanel)
       (let ((lists-outline (lists-outline-view sidepanel)))
+ 	  (let* ((table-column (#/tableColumnWithIdentifier: lists-outline #@"list"))
+		 (cell (make-instance 'sidebar-custom-cell)))
+	    (#/setEditable: cell #$YES)
+	    (#/setDataCell: table-column cell))
 	(refresh-sidetree-contents sidepanel)
 	(#/reloadData lists-outline)
 	(#/expandItem:expandChildren: lists-outline nil t)
