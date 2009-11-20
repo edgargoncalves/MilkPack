@@ -12,9 +12,10 @@
    (load-data-button            :foreign-type :id :accessor load-data-button)
    (contacts-table-view         :foreign-type :id :accessor contacts-table-view)
    (lists-table-view            :foreign-type :id :accessor lists-table-view)
-   (tasks-table-view            :foreign-type :id :accessor tasks-table-view)
+   ;; (tasks-table-view            :foreign-type :id :accessor tasks-table-view)
    (add-task-hud                :foreign-type :id :accessor add-task-hud)
    (task-details-hud            :foreign-type :id :accessor task-details-hud)
+   (tasklist-controller         :foreign-type :id :accessor tasklist-controller)
    (sidepanel-controller        :foreign-type :id :accessor sidepanel-controller)
    (date-formatter              :foreign-type :id :accessor date-formatter)
    (statusbar-menu              :foreign-type :id :accessor statusbar-menu)
@@ -65,8 +66,15 @@
   
   (#/loadDataFromDefaults: *rtm-controller* nil)
   ;; Assign a double-click action:
-  (#/setDoubleAction: (tasks-table-view *rtm-controller*)
+  (#/setDoubleAction: (tasks-table-view (tasklist-controller *rtm-controller*))
 		      (GUI::@selector "doubleClick:")))
+
+
+;; double click action:
+(objc:defmethod (#/doubleClick: :void) ((self rtm-controller) sender)
+  (declare (ignore sender)
+	   (special *rtm-controller*))
+  (#/showWindow: (task-details-hud *rtm-controller*) *rtm-controller*))
 
 
 ;; Controller action: authorize on web
@@ -82,23 +90,19 @@
 (defmethod reload-contents ((self rtm-controller))
   (let ((contacts-table (contacts-table-view self))
 	(sidepanel (sidepanel-controller self))
-	(tasks-table (tasks-table-view self)))
+	(tasks-table-c (tasklist-controller self)))
     (unless (%null-ptr-p contacts-table)
       (#/reloadData contacts-table))
-    (unless (%null-ptr-p tasks-table)
-      (#/reloadData tasks-table))
+    (unless (%null-ptr-p tasks-table-c)
+      (#/reloadData (tasks-table-view tasks-table-c)))
     (unless (%null-ptr-p sidepanel)
-      (let ((lists-outline (lists-outline-view sidepanel)))
- 	  (let* ((table-column (#/tableColumnWithIdentifier: lists-outline #@"list"))
-		 (cell (make-instance 'sidebar-custom-cell)))
-	    (#/setEditable: cell #$YES)
-	    (#/setDataCell: table-column cell))
-	(refresh-sidetree-contents sidepanel)
-	(#/reloadData lists-outline)
-	(#/expandItem:expandChildren: lists-outline nil t)
-	(let ((indexes (make-instance 'ns:ns-index-set)))
-	  (#/initWithIndex: indexes 1)
-	  (#/selectRowIndexes:byExtendingSelection: lists-outline indexes nil))))))
+      (let* ((lists-outline (lists-outline-view sidepanel))
+	     (table-column (#/tableColumnWithIdentifier: lists-outline #@"list"))
+	     ;; TODO: check if we already have a custom cell on, first.
+	     (cell (make-instance 'sidebar-custom-cell)))
+	(#/setEditable: cell #$YES)
+	(#/setDataCell: table-column cell)
+	(redraw-sidepanel :needs-server-refresh-p nil)))))
 
 ;; Controller action: fetch data from RTM
 (def-ibaction #/fetchData: rtm-controller
@@ -121,15 +125,16 @@
 `(def-ibaction ,name rtm-controller
    (declare (special *currently-selected-task* *currently-selected-task-list*))
    (when (and *currently-selected-task-list* *currently-selected-task*)
-     (let* ((rtmi (rtm-instance self)))
+     (let* ((rtmi (rtm-instance self))
+	    (taskstableview (tasks-table-view (tasklist-controller self))))
        ;; operate on the task
        (,rtm-operation *currently-selected-task*)
        ;; redraw current task list again:
        (setf (get-current-tasks rtmi) (get-current-tasks-filtered-and-sorted))
        (setf *currently-selected-task*
-	     (get-table-view-selected-item (tasks-table-view self)
+	     (get-table-view-selected-item taskstableview
 					   (get-current-tasks-filtered-and-sorted)))
-       (#/reloadData (tasks-table-view self))
+       (#/reloadData taskstableview)
        (save-app-data rtmi)))))
 
 (make-task-ibaction #/deleteTask:   rtm::rtm-delete-task)

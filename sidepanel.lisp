@@ -45,38 +45,60 @@
   (filter (lambda (task) (string= (subseq (rtm-lisp-api::get-name task) 0 1) "@"))
     (rtm-lisp-api::get-task-lists rtm-info)))
 
+(defclass task-list-sidebar-group ()
+  ((name    :accessor name    :initarg :name)
+   (lists   :accessor lists   :initarg :lists)
+   (icon    :accessor icon    :initarg :icon)
+   (iconimg      :accessor iconimg      :initform nil)
+   (list-nsnames :accessor list-nsnames :initform nil)))
+
+(defun find-list-group (list-nsname)
+  (declare (special *sidetree-lists*))
+  ;;find group with proper list
+  (or (dolist (group *sidetree-lists*)
+	(when (member list-nsname (list-nsnames group))
+	  (return group)))
+      (error "FIND-LIST-GROUP: list not found on any group, check it: ~s" (make-lisp-string list-nsname))))
+
 
 (defmethod refresh-sidetree-contents ((self sidepanel-controller))
   "sets the nsmutabledictionary to hold all the relevant content. dynamically refreshes contents."
   (declare (special *sidetree-lists* *sidetree-root*))
-  (flet ((convert-list-to-nsarray (list)
-	   (let ((array (#/array ns:ns-mutable-array)))
-	     (dolist (elt list)
-	       (#/addObject: array (make-nsstring elt)))
-	     array)))
-    (let ((rtm-info (rtm-user-info (rtm-instance self))))
-      (unless *sidetree-lists*
-	(setf *sidetree-lists*
-	      `((,(make-nsstring "Smart Lists")  . ,(get-smart-lists rtm-info))
-		(,(make-nsstring "Buckets")      . ,(get-bucket-lists rtm-info))
-		(,(make-nsstring "Projects")     . ,(get-project-lists rtm-info))
-		(,(make-nsstring "Next Actions") . ,(get-context-lists rtm-info))
-		(,(make-nsstring "Main")         . ,(get-regular-lists rtm-info)))))
-      (let ((dict (make-instance 'ns:ns-mutable-dictionary :with-capacity 2)))
-	(dolist (l *sidetree-lists*)
-	  (let ((name (car l))
-		(lists (cdr l)))
-	    (#/setObject:forKey: dict
-				 (convert-list-to-nsarray
-				  (mapcar #'rtm-lisp-api::get-name lists))
-				 name)))
-	(setf *sidetree-root* dict)))))
+  (let ((rtm-info (rtm-user-info (rtm-instance self))))
+    ;; Prepare sidetree-lists in case they are empty
+    ;; hint: set them to nil before, for a refresh.
+    (unless *sidetree-lists*
+      (setf *sidetree-lists*
+	    (mapcar #'(lambda (elt) (make-instance 'task-list-sidebar-group
+					      :name (first elt)
+					      :icon (second elt)
+					      :lists (funcall (third elt) rtm-info)))
+		    `((,#@"Smart Lists"  "smart.icns"   get-smart-lists)
+		      (,#@"Buckets"      "bucket.icns"  get-bucket-lists)
+		      (,#@"Projects"     "project.icns" get-project-lists)
+		      (,#@"Next Actions" "context.icns" get-context-lists)
+		      (,#@"Main"         "main.icns"    get-regular-lists))))))
+  ;; create ns-object with sidebar contents. dic(string<->array(string)).
+  (let ((dict (make-instance 'ns:ns-mutable-dictionary :with-capacity 2)))
+    (dolist (group *sidetree-lists*) ;; l is of type task-list-sidebar-group.
+      (let ((group-name (name group))
+	    (lists (lists group)))
+	(#/setObject:forKey: dict
+			     (convert-list-to-nsarray
+			      lists
+			      (lambda (task-list)
+				(let ((nsname (make-nsstring (rtm-lisp-api::get-name task-list))))
+				  (push nsname (list-nsnames group))
+				  nsname)))
+			     group-name)))
+    (setf *sidetree-root* dict)))
 
-(defun redraw-sidepanel ()
+(defun redraw-sidepanel (&key (needs-server-refresh-p t))
   (declare (special *rtm-controller* rtm::*rtm-user-info* *sidetree-lists*))
   (let* ((sidepanel (sidepanel-controller *rtm-controller*))
 	   (lists-outline (lists-outline-view sidepanel)))
-    (rtm::rtm-list-task-lists)
+    (when needs-server-refresh-p
+      (rtm::rtm-list-task-lists))
     (setf *sidetree-lists* nil)
     (setf (rtm-user-info (rtm-instance *rtm-controller*)) rtm::*rtm-user-info*)
     (refresh-sidetree-contents sidepanel)
@@ -104,10 +126,8 @@
 	 (if *sidetree-root* (#/count *sidetree-root*) 0))
 	((or (typep item 'ns:ns-mutable-dictionary)
 	     (typep item 'ns:ns-mutable-array))
-	 ;; (format t "numberOfChildren: item ~s, type ~s~%" item (type-of item))
 	 (#/count item))
 	(t
-	 ;; (format t "numberOfChildren: 0 item ~s, type ~s~%" item (type-of item))
 	 0)))
 
 (objc:defmethod (#/outlineView:isItemExpandable: :<BOOL>)
@@ -124,12 +144,11 @@
      item)
   (declare (ignore outline-view))
   (declare (special *sidetree-root*))
-  (cond ((%null-ptr-p item)
+  (cond ((%null-ptr-p item) ;; root
 	 (#/objectForKey: *sidetree-root*
 			  (#/objectAtIndex: (#/allKeys *sidetree-root*)
 					    index)))
-	((typep item 'ns:ns-mutable-array)
-	 ;; (format t "chilcdOfItem: @array item ~s~%" item)
+	((typep item 'ns:ns-mutable-array) ;;group item
 	 (#/objectAtIndex: item index))
 	(t
 	 nil)))
@@ -139,15 +158,13 @@
      (outline-view (:* (:struct :<NSO>utline<V>iew)))
      (table-column (:* (:struct :<NST>able<C>olumn)))
      item)
-  (cond ((typep item 'ns:ns-mutable-array)
-	 ;;get parent's (root) used key
+  (cond ((typep item 'ns:ns-mutable-array) ;;get parent's (root) used key
 	 (get-sidetree-item-key item))
 	((typep item 'ns:ns-string)
 	 item)
-	((typep item 'ns:ns-dictionary)
+	((typep item 'ns:ns-dictionary) ;; root, shouldn't appear
 	 #@"nsdictionary")
 	(t
-	 ;;(format t "objectValueFor...: @t item ~s~%" item)
 	 nil)))
 
 ;; Identify groups on the sidebar:
@@ -155,7 +172,18 @@
     ((self sidepanel-controller) outline-view item)
   (declare (ignore outline-view))
   (or (typep item 'ns:ns-dictionary)
-	  (typep item 'ns:ns-mutable-array)))
+      (typep item 'ns:ns-mutable-array)))
+
+
+(defmethod get-ns-image ((group task-list-sidebar-group))
+  "Loads an image, or uses an already loaded image. Also sets its size."
+  (unless (iconimg group)
+    (setf (iconimg group) (#/imageNamed: (find-class 'ns:ns-image)
+					 (make-nsstring (icon group))))
+    (#/setSize: (iconimg group) (ns:make-ns-size 24 24)))
+  (iconimg group))
+
+
 
 ;; Make group letters be uppercased:
 (objc:defmethod (#/outlineView:willDisplayCell:forTableColumn:item: :void)
@@ -163,18 +191,16 @@
   (declare (ignore table-column outline-view))
   (when (and (not (%null-ptr-p cell))
 	     (typep item 'ns:ns-string)) ;; it's a list name
-    ;; TODO: memoize image:
-    ;; TODO: get image according to group type
-    (setf (image cell) (#/imageNamed: (find-class 'ns:ns-image) #@"note.png"))
-    (setf (text cell) item))
+    ;; fetch images
+    (setf (image cell) (get-ns-image (find-list-group item))))
   (when (typep item 'ns:ns-mutable-array) ;; It's a group name
+    ;; put in uppercase with no image
     (let ((new-title (#/mutableCopy (#/attributedStringValue cell))))
       (#/replaceCharactersInRange:withString: new-title
 					      (ns:make-ns-range 0 (#/length new-title))
 					      (#/uppercaseString (#/string new-title)))
       (#/setAttributedStringValue: cell new-title)
       (setf (image cell) +null-ptr+)
-      (setf (text cell) item)
       (#/release new-title))))
 
 ;; Make groups unselectable:
@@ -200,11 +226,15 @@
 	    ;; find the item at 1st-index on the table indexed by parent-idx
 	    ;; by substracting the parent-idx we identify indexes on all groups properly.
 	    (awhen (nth (- (- 1st-index parent-idx) 1)
-			(let ((key (get-sidetree-item-key parent)))
-			  (cdr (assoc key *sidetree-lists* :test #'equal))))
+			(lists (find-list-group item)))
+	      ;; Change the list:
 	      (setf *currently-selected-task-list* it)
-	      (setf (get-current-tasks rtm-instance) (get-current-tasks-filtered-and-sorted))))))
-      (#/reloadData (tasks-table-view *rtm-controller*)))))
+	      (setf (get-current-tasks rtm-instance) (get-current-tasks-filtered-and-sorted))
+	      (let ((view (tasks-table-view (tasklist-controller *rtm-controller*))))
+		;; remove the selection:
+		(#/deselectAll: view nil)
+		;; reload task list view
+		(#/reloadData view)))))))))
 
 
 ;;; End of side panel implementation

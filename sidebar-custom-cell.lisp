@@ -5,9 +5,7 @@
 
 
 (defclass sidebar-custom-cell (ns:ns-text-field-cell)
-  ((image      :foreign-type :id :accessor image)
-   (text       :foreign-type :id :accessor text)
-   (task-count :foreign-type :id :accessor task-count))
+  ((image      :foreign-type :id :accessor image))
   (:metaclass ns:+ns-object))
 
 
@@ -45,12 +43,13 @@
 			   (ns:ns-rect-height cell-frame)
 			   (ns:ns-rect-height image-frame)) 2)))
 	(#/setFlipped: (image self) #$YES)
-	(#/drawAtPoint:fromRect:operation:fraction: (image self)
-						    (ns:make-ns-point (ns:ns-rect-x image-frame)
-								      (ns:ns-rect-y image-frame))
-						    #$NSZeroRect
-						    #$NSCompositeSourceOver
-						    1)
+	(#/drawAtPoint:fromRect:operation:fraction:
+	 (image self)
+	 (ns:make-ns-point (ns:ns-rect-x image-frame)
+			   (ns:ns-rect-y image-frame))
+	 #$NSZeroRect
+	 #$NSCompositeSourceOver
+	 1)
 	(call-next-method cell-frame control-view))))
 
 (objc:defmethod (#/cellSize :<NSS>ize) ((self sidebar-custom-cell))
@@ -60,3 +59,19 @@
 					      (ns:ns-size-width (image self)))
 					  5))
     cell-size))
+
+#|
+Copyright 2009 Edgar Gonçalves
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+|#

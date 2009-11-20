@@ -40,6 +40,14 @@
   (let ((domain (#/standardUserDefaults ns:ns-user-defaults)))
     (make-lisp-string (#/stringForKey: domain key))))
 
+
+(defun convert-list-to-nsarray (list &optional (elt-handler #'make-nsstring))
+  (let ((array (#/array ns:ns-mutable-array)))
+    (dolist (elt list)
+      (#/addObject: array (funcall elt-handler elt)))
+    array))
+
+
 (defmacro def-ibaction (name controller-name &body body)
   `(objc:defmethod (,name :void) ((self ,controller-name) sender)
      (declare (ignorable self sender))

@@ -105,7 +105,7 @@
   (rtm::rtm-complete-task *currently-selected-task*)
   ;; redraw current task list again:
   (setf *currently-selected-task*
-	(get-table-view-selected-item (tasks-table-view *rtm-controller*)
+	(get-table-view-selected-item (tasks-table-view (tasklist-controller *rtm-controller*))
 				      (get-current-tasks-filtered-and-sorted)))
   ;; hide window.
   (hide-window self))
@@ -146,7 +146,7 @@
   ;; redraw current task list again:
   (let ((rtmi (rtm-instance *rtm-controller*)))
     (setf (get-current-tasks rtmi) (get-current-tasks-filtered-and-sorted))
-    (#/reloadData (tasks-table-view *rtm-controller*))
+    (#/reloadData (tasks-table-view (tasklist-controller *rtm-controller*)))
     (save-app-data rtmi)))
 
 
