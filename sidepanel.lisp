@@ -47,7 +47,7 @@
 
 (defclass task-list-sidebar-group ()
   ((name    :accessor name    :initarg :name)
-   (lists   :accessor lists   :initarg :lists)
+   (lists   :accessor lists   :initarg :lists :initform nil)
    (icon    :accessor icon    :initarg :icon)
    (iconimg      :accessor iconimg      :initform nil)
    (list-nsnames :accessor list-nsnames :initform nil)))
@@ -61,6 +61,46 @@
       (error "FIND-LIST-GROUP: list not found on any group, check it: ~s" (make-lisp-string list-nsname))))
 
 
+(defun create-task-list-groups (rtm-info)
+  (let ((groups nil)
+	(task-list-types
+	 ;; (name-nsstring
+	 ;;  icon-string
+	 ;;  (exclude-list-of-prefixes exclude-task-function)
+	 ;;  (include-list-of-prefixes include-task-function)
+	 `((,#@"Main"        "smart.icns"  (("p." "*" "@") rtm-lisp-api::is-smart) nil)
+	   (,#@"Smart Lists" "bucket.icns" (("p." "*" "@") nil) (nil rtm-lisp-api::is-smart))
+	   (,#@"Projects"     "project.icns" nil (("p.") nil))
+	   (,#@"Buckets"      "context.icns" nil (("*") nil))
+	   (,#@"Next Actions" "main.icns"    nil (("@") nil)))))
+    (dolist (tasklist (reverse (rtm-lisp-api::get-task-lists rtm-info)))
+      (let ((list-name (rtm-lisp-api::get-name tasklist)))
+	(awhen (dolist (type task-list-types)
+		 (let ((exclude-fn (second (third type)))
+		       (include-fn (second (fourth type))))
+		   (when (and (not (dolist (prefix (first (third type)))
+				     (when (string= (subseq list-name 0 (length prefix)) prefix)
+				       (return t))))
+			      (not (when exclude-fn (funcall exclude-fn tasklist)))
+			      (not (dolist (prefix (first (fourth type)))
+				     (unless (string= (subseq list-name 0 (length prefix)) prefix)
+				       (return t))))
+			      (if include-fn (funcall include-fn tasklist) t))
+		     ;; we got a match on this type:
+		     (return type))))
+	  ;; we found a type, so use it:
+	  (let ((group (find (first it) groups :key #'name :test #'#/isEqualToString:)))
+	    (unless group
+	      ;;unless there's a group with this name, create one
+	      (setf group (make-instance 'task-list-sidebar-group
+					 :name (first it)
+					 :icon (second it)))
+	      (push group groups))
+	    ;; add tasklist to its lists;
+	    (push tasklist (lists group))))))
+    groups))
+
+
 (defmethod refresh-sidetree-contents ((self sidepanel-controller))
   "sets the nsmutabledictionary to hold all the relevant content. dynamically refreshes contents."
   (declare (special *sidetree-lists* *sidetree-root*))
@@ -68,19 +108,10 @@
     ;; Prepare sidetree-lists in case they are empty
     ;; hint: set them to nil before, for a refresh.
     (unless *sidetree-lists*
-      (setf *sidetree-lists*
-	    (mapcar #'(lambda (elt) (make-instance 'task-list-sidebar-group
-					      :name (first elt)
-					      :icon (second elt)
-					      :lists (funcall (third elt) rtm-info)))
-		    `((,#@"Smart Lists"  "smart.icns"   get-smart-lists)
-		      (,#@"Buckets"      "bucket.icns"  get-bucket-lists)
-		      (,#@"Projects"     "project.icns" get-project-lists)
-		      (,#@"Next Actions" "context.icns" get-context-lists)
-		      (,#@"Main"         "main.icns"    get-regular-lists))))))
+      (setf *sidetree-lists* (create-task-list-groups rtm-info))))
   ;; create ns-object with sidebar contents. dic(string<->array(string)).
   (let ((dict (make-instance 'ns:ns-mutable-dictionary :with-capacity 2)))
-    (dolist (group *sidetree-lists*) ;; l is of type task-list-sidebar-group.
+    (dolist (group *sidetree-lists*) ;; group is of type task-list-sidebar-group.
       (let ((group-name (name group))
 	    (lists (lists group)))
 	(#/setObject:forKey: dict
@@ -107,6 +138,21 @@
     (let ((indexes (make-instance 'ns:ns-index-set)))
       (#/initWithIndex: indexes 1)
       (#/selectRowIndexes:byExtendingSelection: lists-outline indexes nil))))
+
+
+(defmethod reload-sidepanel ((self sidepanel-controller) &key needs-server-refresh-p)
+  (let* ((lists-outline (lists-outline-view self))
+	 (table-column (#/tableColumnWithIdentifier: lists-outline #@"list")))
+    (unless (typep (#/dataCell table-column) 'sidebar-custom-cell)
+      (let ((cell (make-instance 'sidebar-custom-cell)))
+	(#/setEditable: cell #$YES)
+	(#/setDataCell: table-column cell)))
+    (redraw-sidepanel :needs-server-refresh-p needs-server-refresh-p)))
+
+;; Controller action: fetch lists from RTM and redraw sidepanel
+(def-ibaction #/refreshLists: sidepanel-controller
+  (reload-sidepanel self :needs-server-refresh-p t))
+
 
 (defun get-sidetree-item-key (item)
   (declare (special *sidetree-root*))

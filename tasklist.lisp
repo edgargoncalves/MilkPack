@@ -111,7 +111,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; to click on a table use the following methods
 
-(defvar *currently-selected-task*)
+(defvar *currently-selected-task* nil)
 
 (defun get-table-view-selected-item (table-view container &optional selected-row)
   (let ((row (or selected-row (#/selectedRow table-view))))

@@ -74,19 +74,17 @@
   (#/setEnabled: (due-date-view self) (if desired-state #$YES #$NO)))
 
 (def-ibaction #/isDueViewStatus: task-details-controller
-  (declare (special *currently-selected-task*))
   (fixDueDateEnabling self (< 0 (#/state (is-due-view self)))))
 
 
-;; TODO: make view map work.
-;; TODO: make goto link work.
-
 (def-ibaction #/showWindow: task-details-controller
   (declare (special *currently-selected-task*))
-  (call-next-method sender)
-  ;; populate all fields with task details:
-  (update-details-hud self *currently-selected-task*))
+  (when *currently-selected-task*
+    (call-next-method sender)
+    ;; populate all fields with task details:
+    (update-details-hud self *currently-selected-task*)))
 
+;; TODO: make view map work.
 (def-ibaction #/viewMap:   task-details-controller
   ;; Open small pane with webview on google maps, correctly placed.
   (declare (special *currently-selected-task*))

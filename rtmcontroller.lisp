@@ -12,7 +12,7 @@
    (load-data-button            :foreign-type :id :accessor load-data-button)
    (contacts-table-view         :foreign-type :id :accessor contacts-table-view)
    (lists-table-view            :foreign-type :id :accessor lists-table-view)
-   ;; (tasks-table-view            :foreign-type :id :accessor tasks-table-view)
+   (new-task-text-view          :foreign-type :id :accessor new-task-text-view)
    (add-task-hud                :foreign-type :id :accessor add-task-hud)
    (task-details-hud            :foreign-type :id :accessor task-details-hud)
    (tasklist-controller         :foreign-type :id :accessor tasklist-controller)
@@ -61,9 +61,8 @@
 
 (objc:defmethod (#/applicationDidFinishLaunching: :void)
     ((self gui::lisp-application-delegate) notification)
-  (declare (ignore notification))
-  (declare (special *rtm-controller*))  
-  
+  (declare (ignore notification)
+	   (special *rtm-controller*))
   (#/loadDataFromDefaults: *rtm-controller* nil)
   ;; Assign a double-click action:
   (#/setDoubleAction: (tasks-table-view (tasklist-controller *rtm-controller*))
@@ -96,13 +95,7 @@
     (unless (%null-ptr-p tasks-table-c)
       (#/reloadData (tasks-table-view tasks-table-c)))
     (unless (%null-ptr-p sidepanel)
-      (let* ((lists-outline (lists-outline-view sidepanel))
-	     (table-column (#/tableColumnWithIdentifier: lists-outline #@"list"))
-	     ;; TODO: check if we already have a custom cell on, first.
-	     (cell (make-instance 'sidebar-custom-cell)))
-	(#/setEditable: cell #$YES)
-	(#/setDataCell: table-column cell)
-	(redraw-sidepanel :needs-server-refresh-p nil)))))
+      (reload-sidepanel sidepanel))))
 
 ;; Controller action: fetch data from RTM
 (def-ibaction #/fetchData: rtm-controller
@@ -141,6 +134,18 @@
 (make-task-ibaction #/completeTask: rtm::rtm-complete-task)
 (make-task-ibaction #/postponeTask: rtm::rtm-postpone-task)
 
+(def-ibaction #/addTask: rtm-controller
+  (declare (special *currently-selected-task-list*))
+  (let ((rtmi (rtm-instance self))
+	(name (#/stringValue (new-task-text-view self))))
+    ;; add the task
+    (rtm::rtm-add-task *currently-selected-task-list* (make-lisp-string name) t)
+    ;; cleanup field
+    (#/setStringValue: (new-task-text-view self) #@"")
+    ;; redraw current task list to include the new one.
+    (setf (get-current-tasks rtmi) (get-current-tasks-filtered-and-sorted))
+    (#/reloadData (tasks-table-view (tasklist-controller self)))
+    (save-app-data rtmi)))
 
 (def-ibaction #/deleteList: rtm-controller
   (declare (special *currently-selected-task-list*))
