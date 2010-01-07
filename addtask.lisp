@@ -20,7 +20,7 @@
     ;; cleanup fields
     (#/setStringValue: (name-text-view self) #@"")
     ;; redraw current task list to include the new one.
-    (setf (get-current-tasks rtmi) (get-current-tasks-filtered-and-sorted))
+    (update-current-tasklist)
     (#/reloadData (tasks-table-view (tasklist-controller *rtm-controller*)))
     (save-app-data rtmi)))
 

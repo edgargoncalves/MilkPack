@@ -54,6 +54,13 @@
     ,@body))
 
 
+(defmacro with-connectivity (&body body)
+  `(handler-case (progn ,@body)
+     (error (condition)
+       (gui::alert-window :title "MilkPack Network Error"
+			  :message (format nil "You are not online, please reconnect and relaunch MilkPack. Error: ~a" condition)))))
+
+
 #|
 Copyright 2009 Edgar Gonçalves
 

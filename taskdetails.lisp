@@ -102,9 +102,10 @@
   ;; operate on the task
   (rtm::rtm-complete-task *currently-selected-task*)
   ;; redraw current task list again:
+  (update-current-tasklist)
   (setf *currently-selected-task*
 	(get-table-view-selected-item (tasks-table-view (tasklist-controller *rtm-controller*))
-				      (get-current-tasks-filtered-and-sorted)))
+				      (get-current-tasks)))
   ;; hide window.
   (hide-window self))
 
@@ -118,15 +119,14 @@
 		    (funcall #',rtm-selector *currently-selected-task* x)))))
     ;; loop for the properties and do the rtm change operation on them.
     ;; TODO: combo boxes.
-    (save-field name-text-view     rtm::rtm-change-task-name)
-    (save-field estimate-text-view rtm::rtm-change-task-estimate)
-    (save-field location-text-view rtm::rtm-change-task-location)
-    (save-field link-text-view     rtm::rtm-change-task-url)
+    (save-field name-text-view     rtm:rtm-change-task-name)
+    (save-field estimate-text-view rtm:rtm-change-task-estimate)
+    (save-field location-text-view rtm:rtm-change-task-location)
+    (save-field link-text-view     rtm:rtm-change-task-url)
     (let ((has-due-p (< 0 (#/state (is-due-view self)))))
     (save-field due-date-view
-		(lambda (task x) (rtm::rtm-change-task-due-date task
-							   (if has-due-p x "")
-							   :has-due-time-p has-due-p))
+		(lambda (task x)
+		   (rtm:rtm-change-task-due-date task (if has-due-p x "")))
 		:value-extractor (lambda (x)
 				   (let ((out-formatter (make-instance 'ns:ns-date-formatter)))
 				     (#/setDateFormat: out-formatter #@"YYYY-MM-dd'T'HH:mm:ss")
@@ -143,8 +143,10 @@
   (#/orderOut: (#/window self) +null-ptr+)
   ;; redraw current task list again:
   (let ((rtmi (rtm-instance *rtm-controller*)))
-    (setf (get-current-tasks rtmi) (get-current-tasks-filtered-and-sorted))
-    (#/reloadData (tasks-table-view (tasklist-controller *rtm-controller*)))
+    (update-current-tasklist)
+    (let ((tableview (tasks-table-view (tasklist-controller *rtm-controller*))))
+      (#/deselectAll: tableview nil)
+      (#/reloadData tableview))
     (save-app-data rtmi)))
 
 

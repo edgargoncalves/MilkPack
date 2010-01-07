@@ -25,6 +25,19 @@
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; bindings: 
+(defmethod #/offlineTaskNumber ((self rtm-controller))
+  (format t "i wanna know how many tasks: ~s~%" offline::offline-buffer)
+  (make-nsstring (format nil "~a" 3))
+  (length offline::offline-buffer))
+
+(objc:defmethod (#/automaticallyNotifiesObserversForKey: :<BOOL>)
+    ((self rtm-controller) theKey)
+  (if (string= "offlineTaskNumber" (make-lisp-string theKey))
+      #$NO
+      (call-next-method theKey)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; load ui parts controller functions.
 
 (load-module "tasklist.lisp")
@@ -123,10 +136,9 @@
        ;; operate on the task
        (,rtm-operation *currently-selected-task*)
        ;; redraw current task list again:
-       (setf (get-current-tasks rtmi) (get-current-tasks-filtered-and-sorted))
+       (update-current-tasklist)
        (setf *currently-selected-task*
-	     (get-table-view-selected-item taskstableview
-					   (get-current-tasks-filtered-and-sorted)))
+	     (get-table-view-selected-item taskstableview (get-current-tasks)))
        (#/reloadData taskstableview)
        (save-app-data rtmi)))))
 
@@ -139,11 +151,11 @@
   (let ((rtmi (rtm-instance self))
 	(name (#/stringValue (new-task-text-view self))))
     ;; add the task
-    (rtm::rtm-add-task *currently-selected-task-list* (make-lisp-string name) t)
+    (rtm:rtm-add-task *currently-selected-task-list* (make-lisp-string name) t)
     ;; cleanup field
     (#/setStringValue: (new-task-text-view self) #@"")
     ;; redraw current task list to include the new one.
-    (setf (get-current-tasks rtmi) (get-current-tasks-filtered-and-sorted))
+    (update-current-tasklist)
     (#/reloadData (tasks-table-view (tasklist-controller self)))
     (save-app-data rtmi)))
 

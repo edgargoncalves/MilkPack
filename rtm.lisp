@@ -102,7 +102,9 @@
 
 (objc:defmethod #/proceed ((self rtm))
   (let ((output (make-nsstring (proceed-with-authorization))))
-    (setf (rtm-user-info self) (rtm::init-rtm))
+    (setf (rtm-user-info self) (rtm:init-rtm))
+    (with-connectivity
+	(rtm:refresh-rtm))
     output))
 
 (defconstant SETTINGS-FILE-NAME "rtm-data.txt")
@@ -122,7 +124,7 @@
     (make-lisp-string (#/resourcePath main-bundle))))
 
 (defun save-app-data (rtm-instance)
-  (let ((rtm-data rtm::*rtm-user-info*)
+  (let ((rtm-data rtm:*rtm-user-info*)
 	(data-pathname (get-settings-file-name)))
     ;; compile lisp file with data object contents
     (cl-store:store rtm-data data-pathname)
@@ -132,31 +134,69 @@
 (objc:defmethod (#/fetchData :void) ((self rtm))
   (declare (special *currently-selected-task-list*))
   ;; initialize rtm instance
-  (rtm::init-rtm)
-  (when *currently-selected-task-list*
-    (setf (get-current-tasks self)
-	  (rtm-lisp-api::get-tasks *currently-selected-task-list*)))
-  (save-app-data self))
+  (format t "fetching remote data...~%")
+  (rtm:init-rtm)
+  (handler-case (rtm:refresh-rtm)
+    (error (condition)
+      (gui::alert-window :title "MilkPack Network Error"
+			 :message (format nil "You are not online, please reconnect and relaunch MilkPack. Error: ~a" condition))))
+  (save-app-data self)
+  (format t "fetching remote data... done!~%"))
 
 (objc:defmethod (#/loadDataFromDefaults :void) ((self rtm))
-  (declare (special rtm::*rtm-user-info*))
+  (declare (special rtm:*rtm-user-info*))
   (let* ((data-pathname (get-settings-file-name)))
 
     ;;load byte-compiled file and restore the variable contents into rtm-data:
     (handler-case (let ((rtm-data (cl-store:restore data-pathname)))
 		      (setf (rtm-user-info self) rtm-data
-			    rtm::*rtm-user-info* rtm-data))
+			    rtm:*rtm-user-info* rtm-data))
       (cl-store:restore-error ()
 	(#/fetchData self)))))
 
 
-(defun get-current-tasks-filtered-and-sorted ()
+(defun get-current-tasks (&key refresh-from-server)
   (declare (special *currently-selected-task-list*))
   (when *currently-selected-task-list*
-    (rtm::rtm-refresh-list *currently-selected-task-list*)
-    (filter (lambda (x) (string= (rtm-lisp-api::get-completed x) ""))
-      (rtm-lisp-api::get-tasks *currently-selected-task-list*))))
+    (when (or refresh-from-server ;; TODO: check this for true offline work
+	      (null (rtm:get-tasks *currently-selected-task-list*))) ;; otherwise work faster, from memory
+      (rtm:rtm-refresh-list *currently-selected-task-list*))
+    (filter (lambda (x) (string= "" (rtm:get-completed x)))
+	    (rtm:get-tasks *currently-selected-task-list*))))
 
+
+(defun sort-and-filter-tasklist (tasklist)
+  (setf (rtm:get-tasks tasklist)
+	(sort-tasks (rtm:get-tasks tasklist))))
+
+(defun update-current-tasklist (&key refresh-from-server)
+  (declare (special *currently-selected-task-list*))
+  (when refresh-from-server
+    (setf (rtm:get-tasks *currently-selected-task-list*)
+	  (get-current-tasks :refresh-from-server t)))
+  (sort-and-filter-tasklist *currently-selected-task-list*))
+
+(defun sort-tasks (tasks)
+  (let (pri1 pri2 pri3 priN)
+      (dolist (task (sort tasks
+			   #'string>
+			   :key #'(lambda (x) (string-downcase (rtm:get-name x)))))
+	(when (string= "" (rtm:get-completed task))
+	  ;; task isn't complete, so include them in the appropriate bucket:
+	  (cond ((string= (rtm:get-priority task) "1") (push task pri1))
+		((string= (rtm:get-priority task) "2") (push task pri2))
+		((string= (rtm:get-priority task) "3") (push task pri3))
+		(t (push task priN)))))
+      ;;append the bucckets ordingly
+      (flet ((sort-dates (seq)
+	       (sort seq #'(lambda (x y) (cond ((and (string= x "") (string> y "")) nil)
+					  ((and (string= y "") (string> x "")) t)
+					  (t (string< x y))))
+		     :key #'rtm:get-due)))
+	(append (sort-dates pri1)
+		(sort-dates pri2)
+		(sort-dates pri3)
+		(sort-dates priN)))))
 
 
 #|

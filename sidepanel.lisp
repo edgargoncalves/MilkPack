@@ -17,38 +17,38 @@
 
 (defun get-regular-lists (rtm-info)
   (filter (lambda (task)
-	    (let ((str (rtm-lisp-api::get-name task)))
+	    (let ((str (rtm:get-name task)))
 	      (not (or (string= (subseq str 0 2) "p.")
 		       (string= (subseq str 0 1) "*")
 		       (string= (subseq str 0 1) "@")
-		       (rtm-lisp-api::is-smart task)))))
-    (rtm-lisp-api::get-task-lists rtm-info)))
+		       (rtm:is-smart task)))))
+    (rtm:get-task-lists rtm-info)))
 
 (defun get-smart-lists (rtm-info)
   (filter (lambda (task)
-	    (let ((str (rtm-lisp-api::get-name task)))
+	    (let ((str (rtm:get-name task)))
 	      (not (or (string= (subseq str 0 2) "p.")
 		       (string= (subseq str 0 1) "*")
 		       (string= (subseq str 0 1) "@")
-		       (not (rtm-lisp-api::is-smart task))))))
-    (rtm-lisp-api::get-task-lists rtm-info)))
+		       (not (rtm:is-smart task))))))
+    (rtm:get-task-lists rtm-info)))
 
 (defun get-project-lists (rtm-info)
-  (filter (lambda (task) (string= (subseq (rtm-lisp-api::get-name task) 0 2) "p."))
-    (rtm-lisp-api::get-task-lists rtm-info)))
+  (filter (lambda (task) (string= (subseq (rtm:get-name task) 0 2) "p."))
+    (rtm:get-task-lists rtm-info)))
 
 (defun get-bucket-lists (rtm-info)
-  (filter (lambda (task) (string= (subseq (rtm-lisp-api::get-name task) 0 1) "*"))
-    (rtm-lisp-api::get-task-lists rtm-info)))
+  (filter (lambda (task) (string= (subseq (rtm:get-name task) 0 1) "*"))
+    (rtm:get-task-lists rtm-info)))
 
 (defun get-context-lists (rtm-info)
-  (filter (lambda (task) (string= (subseq (rtm-lisp-api::get-name task) 0 1) "@"))
-    (rtm-lisp-api::get-task-lists rtm-info)))
+  (filter (lambda (task) (string= (subseq (rtm:get-name task) 0 1) "@"))
+    (rtm:get-task-lists rtm-info)))
 
 (defclass task-list-sidebar-group ()
-  ((name    :accessor name    :initarg :name)
-   (lists   :accessor lists   :initarg :lists :initform nil)
-   (icon    :accessor icon    :initarg :icon)
+  ((name         :accessor name         :initarg :name)
+   (lists        :accessor lists        :initarg :lists :initform nil)
+   (icon         :accessor icon         :initarg :icon)
    (iconimg      :accessor iconimg      :initform nil)
    (list-nsnames :accessor list-nsnames :initform nil)))
 
@@ -61,20 +61,26 @@
       (error "FIND-LIST-GROUP: list not found on any group, check it: ~s" (make-lisp-string list-nsname))))
 
 
-(defun create-task-list-groups (rtm-info)
+(defun create-task-list-groups (rtm-info &key needs-server-refresh)
   (let ((groups nil)
 	(task-list-types
 	 ;; (name-nsstring
 	 ;;  icon-string
 	 ;;  (exclude-list-of-prefixes exclude-task-function)
 	 ;;  (include-list-of-prefixes include-task-function)
-	 `((,#@"Main"        "smart.icns"  (("p." "*" "@") rtm-lisp-api::is-smart) nil)
-	   (,#@"Smart Lists" "bucket.icns" (("p." "*" "@") nil) (nil rtm-lisp-api::is-smart))
+	 `((,#@"Main"        "main.icns"  (("p." "*" "@") rtm:is-smart) nil)
+	   (,#@"Smart Lists" "smart.icns" (("p." "*" "@") nil) (nil rtm:is-smart))
 	   (,#@"Projects"     "project.icns" nil (("p.") nil))
-	   (,#@"Buckets"      "context.icns" nil (("*") nil))
-	   (,#@"Next Actions" "main.icns"    nil (("@") nil)))))
-    (dolist (tasklist (reverse (rtm-lisp-api::get-task-lists rtm-info)))
-      (let ((list-name (rtm-lisp-api::get-name tasklist)))
+	   (,#@"Buckets"      "bucket.icns" nil (("*") nil))
+	   (,#@"Next Actions" "context.icns"    nil (("@") nil)))))
+    
+    (when (or needs-server-refresh
+	      (null (rtm:get-task-lists rtm-info)))
+      ;; Update lists from server:
+      (rtm:refresh-task-lists-list))
+    
+    (dolist (tasklist (reverse (rtm:get-task-lists rtm-info)))
+      (let ((list-name (rtm:get-name tasklist)))
 	(awhen (dolist (type task-list-types)
 		 (let ((exclude-fn (second (third type)))
 		       (include-fn (second (fourth type))))
@@ -101,14 +107,14 @@
     groups))
 
 
-(defmethod refresh-sidetree-contents ((self sidepanel-controller))
+(defmethod refresh-sidetree-contents ((self sidepanel-controller) &key needs-server-refresh)
   "sets the nsmutabledictionary to hold all the relevant content. dynamically refreshes contents."
   (declare (special *sidetree-lists* *sidetree-root*))
   (let ((rtm-info (rtm-user-info (rtm-instance self))))
     ;; Prepare sidetree-lists in case they are empty
     ;; hint: set them to nil before, for a refresh.
     (unless *sidetree-lists*
-      (setf *sidetree-lists* (create-task-list-groups rtm-info))))
+      (setf *sidetree-lists* (create-task-list-groups rtm-info :needs-server-refresh needs-server-refresh))))
   ;; create ns-object with sidebar contents. dic(string<->array(string)).
   (let ((dict (make-instance 'ns:ns-mutable-dictionary :with-capacity 2)))
     (dolist (group *sidetree-lists*) ;; group is of type task-list-sidebar-group.
@@ -118,21 +124,20 @@
 			     (convert-list-to-nsarray
 			      lists
 			      (lambda (task-list)
-				(let ((nsname (make-nsstring (rtm-lisp-api::get-name task-list))))
+				(let ((nsname (make-nsstring (rtm:get-name task-list))))
 				  (push nsname (list-nsnames group))
 				  nsname)))
 			     group-name)))
     (setf *sidetree-root* dict)))
 
-(defun redraw-sidepanel (&key (needs-server-refresh-p t))
-  (declare (special *rtm-controller* rtm::*rtm-user-info* *sidetree-lists*))
+(defun redraw-sidepanel (&key (needs-server-refresh-p nil))
+  (declare (special *rtm-controller* rtm:*rtm-user-info* *sidetree-lists*))
   (let* ((sidepanel (sidepanel-controller *rtm-controller*))
 	   (lists-outline (lists-outline-view sidepanel)))
-    (when needs-server-refresh-p
-      (rtm::rtm-list-task-lists))
     (setf *sidetree-lists* nil)
-    (setf (rtm-user-info (rtm-instance *rtm-controller*)) rtm::*rtm-user-info*)
-    (refresh-sidetree-contents sidepanel)
+    (setf (rtm-user-info (rtm-instance *rtm-controller*))
+	  rtm:*rtm-user-info*)
+    (refresh-sidetree-contents sidepanel :needs-server-refresh needs-server-refresh-p)
     (#/reloadData lists-outline)
     (#/expandItem:expandChildren: lists-outline nil t)
     (let ((indexes (make-instance 'ns:ns-index-set)))
@@ -151,7 +156,12 @@
 
 ;; Controller action: fetch lists from RTM and redraw sidepanel
 (def-ibaction #/refreshLists: sidepanel-controller
-  (reload-sidepanel self :needs-server-refresh-p t))
+  (declare (special *currently-selected-task-list*))
+  ;;TODO: change name to refreshCurrentList
+  ;; Since fetchData and loadDataFromDefaults already reload all lists,
+  ;;    this button only syncs the current one:
+  (update-current-tasklist :refresh-from-server t)
+  (update-taskview-for-list *currently-selected-task-list*))
 
 
 (defun get-sidetree-item-key (item)
@@ -258,11 +268,9 @@
 ;; delegate message to change selection:
 (objc:defmethod (#/outlineViewSelectionDidChange: :void)
     ((self sidepanel-controller) notification)
-  (declare (special *currently-selected-task-list* *sidetree-lists* *rtm-controller*))
   ;; Note, this method works for single selections only, for now.
   (let* ((changed-table (#/object notification))
-	 (selection (#/selectedRowIndexes changed-table))
-	 (rtm-instance (rtm-instance self)))
+	 (selection (#/selectedRowIndexes changed-table)))
     (when (= 1 (#/count selection))
       (let* ((1st-index (#/firstIndex selection))
 	     (item  (#/itemAtRow: changed-table 1st-index)))
@@ -274,14 +282,16 @@
 	    (awhen (nth (- (- 1st-index parent-idx) 1)
 			(lists (find-list-group item)))
 	      ;; Change the list:
-	      (setf *currently-selected-task-list* it)
-	      (setf (get-current-tasks rtm-instance) (get-current-tasks-filtered-and-sorted))
-	      (let ((view (tasks-table-view (tasklist-controller *rtm-controller*))))
-		;; remove the selection:
-		(#/deselectAll: view nil)
-		;; reload task list view
-		(#/reloadData view)))))))))
+	      (update-taskview-for-list it))))))))
 
+(defun update-taskview-for-list (list)
+  (declare (special *currently-selected-task-list* *rtm-controller*))
+  (setf *currently-selected-task-list* list)
+  (let ((view (tasks-table-view (tasklist-controller *rtm-controller*))))
+    ;; remove the selection:
+    (#/deselectAll: view nil)
+    ;; reload task list view
+    (#/reloadData view)))
 
 ;;; End of side panel implementation
 

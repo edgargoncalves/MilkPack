@@ -30,16 +30,9 @@
 				   #'make-nsstring)))
 	     (awhen (or selected-task (nth row table-contents))
 		    (funcall transformer (funcall selector it))))))
-    (cond ;; ((eql table-view (contacts-table-view self))
-	  ;;  (compute-column-value '(("fullname" . rtm-lisp-api::get-fullname)
-	  ;; 			   ("user"     . rtm-lisp-api::get-username)
-	  ;; 			   ("id"       . rtm-lisp-api::get-id))
-	  ;; 			 (rtm-lisp-api::get-contacts
-	  ;; 			  (rtm-user-info (rtm-instance self)))))
-	  ((eql table-view (tasks-table-view self))
-	   (let* ((task-list (filter (lambda (x) (string= "" ;; no date, not completed.
-						     (rtm-lisp-api::get-completed x))) 
-				     (get-current-tasks (rtm-instance self))))
+    
+    (cond ((eql table-view (tasks-table-view self))
+	   (let* ((task-list (get-current-tasks))
 		  (sel-task (nth row task-list)))
 	     (compute-column-value
 	      `(("description" . rtm-lisp-api::get-name)
@@ -68,8 +61,7 @@
 	;; ((eql table-view (contacts-table-view self))
 	;;  (length (rtm-lisp-api::get-contacts (rtm-user-info (rtm-instance self)))))
 	((eql table-view (tasks-table-view self))
-	 (length (filter (lambda (x) (string= (rtm-lisp-api::get-completed x) ""))
-		   (get-current-tasks (rtm-instance self)))))
+	 (length (get-current-tasks)))
 	(t
 	 0))))
 
@@ -108,6 +100,7 @@
   (declare (ignore cell))
 
   (#/colorWithDeviceRed:green:blue:alpha: ns:ns-color 1 1 0.8 1.0))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; to click on a table use the following methods
 
@@ -124,7 +117,7 @@
   ;; Note, this method works for single selections only, for now.
   (let* ((changed-table (#/object notification)))
     (cond ((eql changed-table (tasks-table-view self))
-	   (aif (get-table-view-selected-item changed-table (get-current-tasks-filtered-and-sorted))
+	   (aif (get-table-view-selected-item changed-table (get-current-tasks))
 		(progn
 		  (setf *currently-selected-task* it)
 		  ;; if details hud is visible, then update it:
