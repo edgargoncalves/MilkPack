@@ -97,15 +97,8 @@
   (ccl::run-program "open" (list (rtm::get-url *currently-selected-task*))))
 
 (def-ibaction #/completeTask:  task-details-controller
-  ;;complete the task
-  (declare (special *currently-selected-task* *currently-selected-task-list* *rtm-controller*))
-  ;; operate on the task
-  (rtm::rtm-complete-task *currently-selected-task*)
-  ;; redraw current task list again:
-  (update-current-tasklist)
-  (setf *currently-selected-task*
-	(get-table-view-selected-item (tasks-table-view (tasklist-controller *rtm-controller*))
-				      (get-current-tasks)))
+  (declare (special *rtm-controller*))
+  (#/completeTask: *rtm-controller* self)
   ;; hide window.
   (hide-window self))
 

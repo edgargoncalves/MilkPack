@@ -14,37 +14,6 @@
 (defvar *sidetree-root* nil)
 
 ;;; To implement an outline view data source for the side panel (source list):
-
-(defun get-regular-lists (rtm-info)
-  (filter (lambda (task)
-	    (let ((str (rtm:get-name task)))
-	      (not (or (string= (subseq str 0 2) "p.")
-		       (string= (subseq str 0 1) "*")
-		       (string= (subseq str 0 1) "@")
-		       (rtm:is-smart task)))))
-    (rtm:get-task-lists rtm-info)))
-
-(defun get-smart-lists (rtm-info)
-  (filter (lambda (task)
-	    (let ((str (rtm:get-name task)))
-	      (not (or (string= (subseq str 0 2) "p.")
-		       (string= (subseq str 0 1) "*")
-		       (string= (subseq str 0 1) "@")
-		       (not (rtm:is-smart task))))))
-    (rtm:get-task-lists rtm-info)))
-
-(defun get-project-lists (rtm-info)
-  (filter (lambda (task) (string= (subseq (rtm:get-name task) 0 2) "p."))
-    (rtm:get-task-lists rtm-info)))
-
-(defun get-bucket-lists (rtm-info)
-  (filter (lambda (task) (string= (subseq (rtm:get-name task) 0 1) "*"))
-    (rtm:get-task-lists rtm-info)))
-
-(defun get-context-lists (rtm-info)
-  (filter (lambda (task) (string= (subseq (rtm:get-name task) 0 1) "@"))
-    (rtm:get-task-lists rtm-info)))
-
 (defclass task-list-sidebar-group ()
   ((name         :accessor name         :initarg :name)
    (lists        :accessor lists        :initarg :lists :initform nil)
@@ -59,7 +28,6 @@
 	(when (member list-nsname (list-nsnames group))
 	  (return group)))
       (error "FIND-LIST-GROUP: list not found on any group, check it: ~s" (make-lisp-string list-nsname))))
-
 
 (defun create-task-list-groups (rtm-info &key needs-server-refresh)
   (let ((groups nil)
@@ -214,9 +182,15 @@
      (outline-view (:* (:struct :<NSO>utline<V>iew)))
      (table-column (:* (:struct :<NST>able<C>olumn)))
      item)
-  (cond ((typep item 'ns:ns-mutable-array) ;;get parent's (root) used key
+  (cond ((and (typep item 'ns:ns-mutable-array)  ;; for now, we don't want anything here.
+	      (#/isEqualToString: (#/identifier table-column) #@"count"))
+	 #@"")
+	((typep item 'ns:ns-mutable-array) ;;get parent's (root) used key
 	 (get-sidetree-item-key item))
-	((typep item 'ns:ns-string)
+	((and (typep item 'ns:ns-string)  ;; we want the badge. number of tasks on this list.
+	      (#/isEqualToString: (#/identifier table-column) #@"count"))
+	 (make-nsstring (get-count-for-list-named (make-lisp-string item) :filter-complete t)))
+	((typep item 'ns:ns-string) ;; we want the list name. (we've got it!)
 	 item)
 	((typep item 'ns:ns-dictionary) ;; root, shouldn't appear
 	 #@"nsdictionary")
@@ -239,25 +213,24 @@
     (#/setSize: (iconimg group) (ns:make-ns-size 24 24)))
   (iconimg group))
 
-
-
-;; Make group letters be uppercased:
+;; Make group letters be uppercased/ places images+badges on lists:
 (objc:defmethod (#/outlineView:willDisplayCell:forTableColumn:item: :void)
     ((self sidepanel-controller) outline-view cell table-column item)
-  (declare (ignore table-column outline-view))
-  (when (and (not (%null-ptr-p cell))
-	     (typep item 'ns:ns-string)) ;; it's a list name
-    ;; fetch images
-    (setf (image cell) (get-ns-image (find-list-group item))))
-  (when (typep item 'ns:ns-mutable-array) ;; It's a group name
-    ;; put in uppercase with no image
-    (let ((new-title (#/mutableCopy (#/attributedStringValue cell))))
-      (#/replaceCharactersInRange:withString: new-title
-					      (ns:make-ns-range 0 (#/length new-title))
-					      (#/uppercaseString (#/string new-title)))
-      (#/setAttributedStringValue: cell new-title)
-      (setf (image cell) +null-ptr+)
-      (#/release new-title))))
+  (declare (ignore outline-view))
+  (unless (#/isEqualToString: (#/identifier table-column) #@"count")
+    (when (and (not (%null-ptr-p cell))
+	       (typep item 'ns:ns-string)) ;; it's a list name
+      ;; fetch images
+      (setf (image cell) (get-ns-image (find-list-group item))))
+    (when (typep item 'ns:ns-mutable-array) ;; It's a group name
+      ;; put in uppercase with no image
+      (let ((new-title (#/mutableCopy (#/attributedStringValue cell))))
+	(#/replaceCharactersInRange:withString: new-title
+						(ns:make-ns-range 0 (#/length new-title))
+						(#/uppercaseString (#/string new-title)))
+	(#/setAttributedStringValue: cell new-title)
+	(setf (image cell) +null-ptr+)
+	(#/release new-title)))))
 
 ;; Make groups unselectable:
 (objc:defmethod (#/outlineView:shouldSelectItem: :<BOOL>)

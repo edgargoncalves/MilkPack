@@ -46,17 +46,17 @@
 	;; Produces a new frob and requests a new token.
 	(progn
 	  (gui::alert-window :title "MilkPack System Settings"
-			     :message "You need to authorize RTM to give access to MilkPack. Continue to go to a browser and do that, then come back here.")
+			     :message "You must authorize Milkpack to access your Remember The Milk account. Pressing Okay will take you to a browser to do that. Come back to the MilkPack window afterwards.")
 	  (handler-case
 	      (request-rtm-authorization) ;; sets a new frob!
 	    (error () ;; frob is invalid!
 	      (set-default-value #@"FrobKey" (make-nsstring ""))
 	      ;; TODO: quit everything... using #/terminate: on the nsapplication.
 	      (gui::alert-window :title "MilkPack Authentication Error"
-			     :message "RTM didn't give access to MilkPack (are you offline?). Press OK to quit this app, try again when later.")
+			     :message "Remember The Milk didn't give MilkPack permission. Are you offline? Press OK to quit this app, try again later.")
 	      (proceed-with-authorization)))
 	  (gui::alert-window :title "MilkPack System Settings"
-			     :message "Your browser should be asking you now for authorization to use RTM. Press OK when that's done.")
+			     :message "Your browser should have asked you for permission to use your online data. Press OK when that's done.")
 	  ;;Set default frob.
 	  (set-default-value #@"FrobKey" (make-nsstring rtm:*rtm-api-current-frob*))
 	  (set-default-value #@"TokenKey" (make-nsstring ""))
@@ -134,14 +134,12 @@
 (objc:defmethod (#/fetchData :void) ((self rtm))
   (declare (special *currently-selected-task-list*))
   ;; initialize rtm instance
-  (format t "fetching remote data...~%")
   (rtm:init-rtm)
   (handler-case (rtm:refresh-rtm)
     (error (condition)
       (gui::alert-window :title "MilkPack Network Error"
 			 :message (format nil "You are not online, please reconnect and relaunch MilkPack. Error: ~a" condition))))
-  (save-app-data self)
-  (format t "fetching remote data... done!~%"))
+  (save-app-data self))
 
 (objc:defmethod (#/loadDataFromDefaults :void) ((self rtm))
   (declare (special rtm:*rtm-user-info*))

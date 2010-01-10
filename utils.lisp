@@ -26,7 +26,7 @@
 
 (defun make-nsstring (str)
   (unless (typep str 'ns:ns-mutable-string)
-    (#/autorelease (ccl::%make-nsstring str))))
+    (#/autorelease (ccl::%make-nsstring (if (stringp str) str (format nil "~a" str))))))
 
 (defun make-lisp-string (nsstr)
   (ccl::lisp-string-from-nsstring nsstr))
@@ -62,7 +62,7 @@
 
 
 #|
-Copyright 2009 Edgar Gonçalves
+Copyright 2009, 2010 Edgar Gonçalves
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.

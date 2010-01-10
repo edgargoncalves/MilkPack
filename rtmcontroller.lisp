@@ -33,7 +33,7 @@
 
 (objc:defmethod (#/automaticallyNotifiesObserversForKey: :<BOOL>)
     ((self rtm-controller) theKey)
-  (if (string= "offlineTaskNumber" (make-lisp-string theKey))
+  (if (#/isEqualToString: #@"offlineTaskNumber" theKey)
       #$NO
       (call-next-method theKey)))
 
@@ -135,16 +135,15 @@
 	    (taskstableview (tasks-table-view (tasklist-controller self))))
        ;; operate on the task
        (,rtm-operation *currently-selected-task*)
-       ;; redraw current task list again:
+       ;; redraw current task list again, with no selected task:
        (update-current-tasklist)
-       (setf *currently-selected-task*
-	     (get-table-view-selected-item taskstableview (get-current-tasks)))
+       (update-taskview-for-list *currently-selected-task-list*)
        (#/reloadData taskstableview)
        (save-app-data rtmi)))))
 
-(make-task-ibaction #/deleteTask:   rtm::rtm-delete-task)
-(make-task-ibaction #/completeTask: rtm::rtm-complete-task)
-(make-task-ibaction #/postponeTask: rtm::rtm-postpone-task)
+(make-task-ibaction #/deleteTask:   rtm:rtm-delete-task)
+(make-task-ibaction #/completeTask: rtm:rtm-complete-task)
+(make-task-ibaction #/postponeTask: rtm:rtm-postpone-task)
 
 (def-ibaction #/addTask: rtm-controller
   (declare (special *currently-selected-task-list*))
