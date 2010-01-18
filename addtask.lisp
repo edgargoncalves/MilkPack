@@ -10,17 +10,17 @@
 
 ;; this method adds a task, then closes itself.
 (def-ibaction #/addTask: add-task-controller
-  (declare (special *rtm-controller* *currently-selected-task-list*))
+  (declare (special *rtm-controller*))
   (let ((rtmi (rtm-instance self))
 	(name (#/stringValue (name-text-view self))))
     ;; add the task
-    (rtm::rtm-add-task *currently-selected-task-list* (make-lisp-string name) t)
+    (rtm::rtm-add-task (get-active-list rtmi) (make-lisp-string name) t)
     ;; hide nib
     (#/orderOut: (#/window self) +null-ptr+)
     ;; cleanup fields
     (#/setStringValue: (name-text-view self) #@"")
     ;; redraw current task list to include the new one.
-    (update-current-tasklist)
+    (update-current-tasklist rtmi)
     (#/reloadData (tasks-table-view (tasklist-controller *rtm-controller*)))
     (save-app-data rtmi)))
 

@@ -8,6 +8,15 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Package initialization
 (require :cocoa)
+
+;; load required frameworks:
+;; this takes a bit to load... shame!
+;; (eval-when (:compile-toplevel :load-toplevel :execute)
+;;   ;; (objc:load-framework "WebKit" :webkit)
+;;   ;; (objc:load-framework "Quartz" :quartz)
+;;   ;; (objc:load-framework "QuartzCore" :quartzcore)
+;;   )
+
 (load #p"/Users/eemg/ccl-init.lisp")
 
 ;; Uncomment the following two lines to enable SLIME debugging (attent the port):

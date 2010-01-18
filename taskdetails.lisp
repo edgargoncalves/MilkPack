@@ -17,6 +17,9 @@
    (is-due-view        :foreign-type :id :accessor is-due-view)
    (estimate-text-view :foreign-type :id :accessor estimate-text-view)
    (list-text-view     :foreign-type :id :accessor list-text-view)
+   (map-view           :foreign-type :id :accessor map-view)
+   (map-link           :accessor map-link)
+   
    (rtm-instance       :foreign-type :id :accessor rtm-instance :initarg :rtm))
   (:metaclass ns:+ns-object))
 
@@ -29,17 +32,17 @@
   (macrolet ((handle-value (rtm-selector
 			    iboutlet-selector &key
 			    (handler-fn 'make-nsstring)
-			    default-value
+			    (default-value nil default-value-setp)
 			    (value-checker '(lambda (x) x))
 			    (view-changer '#/setStringValue:))
 	       `(let ((x (funcall #',rtm-selector task)))
 		  (funcall #',view-changer
 			   (funcall #',iboutlet-selector self)
-			   (if (funcall #',value-checker x) (funcall #',handler-fn x) (or ,default-value #@""))))))
-    (handle-value rtm::get-name     name-text-view)
-    (handle-value rtm::get-priority priority-text-view)
-    (handle-value rtm::get-estimate estimate-text-view)
-    (handle-value rtm::get-url      link-text-view)
+			   (if (funcall #',value-checker x) (funcall #',handler-fn x) (if ,default-value-setp ,default-value #@""))))))
+    (handle-value rtm:get-name     name-text-view)
+    (handle-value rtm:get-priority priority-text-view)
+    (handle-value rtm:get-estimate estimate-text-view)
+    (handle-value rtm:get-url      link-text-view)
     (#/setDateValue: (due-date-view self) (#/date ns:ns-date))
 
     (macrolet ((handle-date-picker (rtm-selector view-selector)
@@ -51,20 +54,31 @@
 				:handler-fn (lambda (x) (#/dateFromString: (date-formatter *rtm-controller*)
 								      (make-nsstring
 								       (car (split-sequence:split-sequence #\Z x))))))))
-      (fixDueDateEnabling self (not (string= "" (rtm::get-due task))))
-      (handle-date-picker rtm::get-due      due-date-view)
-      (handle-date-picker rtm::get-created  created-date-view)
-      (handle-date-picker rtm::get-modified modified-date-view))
+      (fixDueDateEnabling self (not (string= "" (rtm:get-due task))))
+      (handle-date-picker rtm:get-due      due-date-view)
+      (handle-date-picker rtm:get-created  created-date-view)
+      (handle-date-picker rtm:get-modified modified-date-view))
     
-    (handle-value rtm::get-tags
+    (handle-value rtm:get-tags
 		  tags-token-view
 		  :handler-fn (lambda (x) (make-nsstring (format nil "~{~a~^, ~}" (if (stringp (car x)) x (car x))))))
-    (handle-value rtm::get-list
+    (handle-value rtm:get-list
 		  list-text-view
-		  :handler-fn (lambda (x) (make-nsstring (rtm::get-name x))))
-    (handle-value rtm::get-location
+		  :handler-fn (lambda (x) (make-nsstring (rtm:get-name x))))
+    (handle-value rtm:get-location
 		  location-text-view
-		  :handler-fn (lambda (x) (make-nsstring  (rtm::get-name x))))))
+		  :handler-fn (lambda (x) (make-nsstring  (rtm:get-name x))))
+    (handle-value rtm:get-location
+		  map-view
+		  :view-changer (lambda (view url)
+				  (if url
+				      (let* ((image (#/initWithContentsOfURL: (#/alloc ns:ns-image) (url-from-string url))))
+					(when image
+					  (#/setImage: view image)
+					  (#/release image)))
+				      (#/setImage: view (#/imageNamed: (find-class 'ns:ns-image) #@"globe.png"))))
+		  :default-value nil ;; to detect there were no location and load a generic globe icon
+		  :handler-fn (lambda (x) (rtm:get-location-image-url x :zoom 15 :maptype "hybrid" :width 203 :height 119)))))
 
 
 (defmethod fixDueDateEnabling ((self task-details-controller) desired-state)
@@ -84,17 +98,16 @@
     ;; populate all fields with task details:
     (update-details-hud self *currently-selected-task*)))
 
-;; TODO: make view map work.
 (def-ibaction #/viewMap:   task-details-controller
   ;; Open small pane with webview on google maps, correctly placed.
   (declare (special *currently-selected-task*))
-  ;; (format t "TODO - viewMap: ~s~%" (rtm::get-location *currently-selected-task*))
-  (ccl::run-program "open" (list "http://maps.google.com")))
+  (let* ((location (rtm:get-location *currently-selected-task*)))
+    (ccl::run-program "open" (list (rtm:get-location-url location)))))
 
 (def-ibaction #/goToLink:  task-details-controller
   ;; Open browser window on url page
   (declare (special *currently-selected-task*))
-  (ccl::run-program "open" (list (rtm::get-url *currently-selected-task*))))
+  (ccl::run-program "open" (list (rtm:get-url *currently-selected-task*))))
 
 (def-ibaction #/completeTask:  task-details-controller
   (declare (special *rtm-controller*))
@@ -108,7 +121,7 @@
   (macrolet ((save-field (field-selector rtm-selector &key (when t)
 					 (value-extractor '(lambda (x) (make-lisp-string (#/stringValue x)))))
 	       `(let ((x (funcall #',value-extractor (funcall #',field-selector self))))
-		  (when ,when
+		  (when ,when ;;TODO - don't call this if the value is the same as the one we're trying to set.
 		    (funcall #',rtm-selector *currently-selected-task* x)))))
     ;; loop for the properties and do the rtm change operation on them.
     ;; TODO: combo boxes.
@@ -124,9 +137,9 @@
 				   (let ((out-formatter (make-instance 'ns:ns-date-formatter)))
 				     (#/setDateFormat: out-formatter #@"YYYY-MM-dd'T'HH:mm:ss")
 				     (make-lisp-string (#/stringFromDate: out-formatter (#/dateValue x)))))))
-    (save-field priority-text-view rtm::rtm-change-task-priority
+    (save-field priority-text-view rtm:rtm-change-task-priority
 		:value-extractor (lambda (x) (make-lisp-string (#/labelForSegment: x (#/selectedSegment x)))))
-    (save-field tags-token-view    rtm::rtm-change-task-tags))
+    (save-field tags-token-view    rtm:rtm-change-task-tags))
   (hide-window self))
 
 
@@ -136,7 +149,7 @@
   (#/orderOut: (#/window self) +null-ptr+)
   ;; redraw current task list again:
   (let ((rtmi (rtm-instance *rtm-controller*)))
-    (update-current-tasklist)
+    (update-current-tasklist rtmi)
     (let ((tableview (tasks-table-view (tasklist-controller *rtm-controller*))))
       (#/deselectAll: tableview nil)
       (#/reloadData tableview))

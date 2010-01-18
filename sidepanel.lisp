@@ -9,7 +9,6 @@
     (rtm-instance                 :foreign-type :id :accessor rtm-instance))
   (:metaclass ns:+ns-object))
 
-(defvar *currently-selected-task-list* nil)
 (defvar *sidetree-lists* nil)
 (defvar *sidetree-root* nil)
 
@@ -43,7 +42,8 @@
 	   (,#@"Next Actions" "context.icns"    nil (("@") nil)))))
     
     (when (or needs-server-refresh
-	      (null (rtm:get-task-lists rtm-info)))
+	      ;; (null (rtm:get-task-lists rtm-info))
+	      )
       ;; Update lists from server:
       (rtm:refresh-task-lists-list))
     
@@ -98,6 +98,12 @@
 			     group-name)))
     (setf *sidetree-root* dict)))
 
+(defun redraw-sidepanel-counts ()
+  (declare (special *rtm-controller*))
+  (let* ((sidepanel (sidepanel-controller *rtm-controller*))
+	 (lists-outline (lists-outline-view sidepanel)))
+    (#/reloadData lists-outline)))
+
 (defun redraw-sidepanel (&key (needs-server-refresh-p nil))
   (declare (special *rtm-controller* rtm:*rtm-user-info* *sidetree-lists*))
   (let* ((sidepanel (sidepanel-controller *rtm-controller*))
@@ -124,12 +130,11 @@
 
 ;; Controller action: fetch lists from RTM and redraw sidepanel
 (def-ibaction #/refreshLists: sidepanel-controller
-  (declare (special *currently-selected-task-list*))
   ;;TODO: change name to refreshCurrentList
   ;; Since fetchData and loadDataFromDefaults already reload all lists,
   ;;    this button only syncs the current one:
-  (update-current-tasklist :refresh-from-server t)
-  (update-taskview-for-list *currently-selected-task-list*))
+  (update-current-tasklist (rtm-instance self) :refresh-from-server t)
+  (update-taskview-for-list (get-active-list (rtm-instance self))))
 
 
 (defun get-sidetree-item-key (item)
@@ -258,13 +263,14 @@
 	      (update-taskview-for-list it))))))))
 
 (defun update-taskview-for-list (list)
-  (declare (special *currently-selected-task-list* *rtm-controller*))
-  (setf *currently-selected-task-list* list)
+  (declare (special *rtm-controller*))
+  (set-active-list (rtm-instance *rtm-controller*) list)
   (let ((view (tasks-table-view (tasklist-controller *rtm-controller*))))
     ;; remove the selection:
     (#/deselectAll: view nil)
     ;; reload task list view
-    (#/reloadData view)))
+    (#/reloadData view)
+    (redraw-sidepanel-counts)))
 
 ;;; End of side panel implementation
 

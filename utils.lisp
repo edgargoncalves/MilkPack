@@ -53,6 +53,10 @@
      (declare (ignorable self sender))
     ,@body))
 
+(defmacro url-from-string (s)
+  `(ccl::with-autorelease-pool
+    (#/retain (#/URLWithString: ns:ns-url (make-nsstring (string ,s))))))
+
 
 (defmacro with-connectivity (&body body)
   `(handler-case (progn ,@body)

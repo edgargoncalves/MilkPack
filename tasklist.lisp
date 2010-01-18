@@ -16,6 +16,7 @@
 ;; Interface for the datasource of the tableview:
 (objc:defmethod #/tableView:objectValueForTableColumn:row:
     ((self tasklist-controller) table-view column (row :<NSI>nteger))
+  (declare (special *rtm-controller*))
   (flet ((compute-column-value
 	     (columns-selectors-alist table-contents &optional selected-task)
 	   (let* ((column-id (make-lisp-string (#/identifier column)))
@@ -32,7 +33,7 @@
 		    (funcall transformer (funcall selector it))))))
     
     (cond ((eql table-view (tasks-table-view self))
-	   (let* ((task-list (get-current-tasks))
+	   (let* ((task-list (get-current-tasks (rtm-instance *rtm-controller*)))
 		  (sel-task (nth row task-list)))
 	     (compute-column-value
 	      `(("description" . rtm-lisp-api::get-name)
@@ -53,15 +54,14 @@
 
 (objc:defmethod (#/numberOfRowsInTableView: :<NSI>nteger)
     ((self tasklist-controller) table-view)
+  (declare (special *rtm-controller*))
   (if (or (null (rtm-instance self))
 	  (%null-ptr-p (rtm-instance self))
 	  (null (rtm-user-info (rtm-instance self))))
       0
       (cond 
-	;; ((eql table-view (contacts-table-view self))
-	;;  (length (rtm-lisp-api::get-contacts (rtm-user-info (rtm-instance self)))))
 	((eql table-view (tasks-table-view self))
-	 (length (get-current-tasks)))
+	 (length (get-current-tasks (rtm-instance *rtm-controller*))))
 	(t
 	 0))))
 
@@ -82,9 +82,9 @@
 	    (let ((color (cond ((string= priority "1")
 				(make-color 0.91 0.32 0))
 			       ((string= priority "2")
-				(make-color 0.2 0.6 255))
+				(make-color 0 0.38 0.75))
 			       ((string= priority "3")
-				(make-color 0 0.38 0.75)))))
+				(make-color 0.2 0.6 255)))))
 	      (#/setDrawsBackground: cell #$YES)
 	      (#/setBackgroundColor: cell color)))))))
 
@@ -117,7 +117,7 @@
   ;; Note, this method works for single selections only, for now.
   (let* ((changed-table (#/object notification)))
     (cond ((eql changed-table (tasks-table-view self))
-	   (aif (get-table-view-selected-item changed-table (get-current-tasks))
+	   (aif (get-table-view-selected-item changed-table (get-current-tasks (rtm-instance *rtm-controller*)))
 		(progn
 		  (setf *currently-selected-task* it)
 		  ;; if details hud is visible, then update it:

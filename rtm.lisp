@@ -54,7 +54,8 @@
 	      ;; TODO: quit everything... using #/terminate: on the nsapplication.
 	      (gui::alert-window :title "MilkPack Authentication Error"
 			     :message "Remember The Milk didn't give MilkPack permission. Are you offline? Press OK to quit this app, try again later.")
-	      (proceed-with-authorization)))
+	      ;; (proceed-with-authorization)
+	      (ccl:quit)))
 	  (gui::alert-window :title "MilkPack System Settings"
 			     :message "Your browser should have asked you for permission to use your online data. Press OK when that's done.")
 	  ;;Set default frob.
@@ -90,9 +91,16 @@
 ;;; Model entity: Rtm
 
 (defclass rtm (ns:ns-object)
-  ((user-info     :initform nil :accessor rtm-user-info)
-   (current-tasks :initform nil :accessor get-current-tasks :initarg  :current-tasks))
+  ((user-info      :initform nil :accessor rtm-user-info)
+   (active-list-id :initform ""  :accessor get-active-list-id))
   (:metaclass ns:+ns-object))
+
+(defmethod get-active-list ((self rtm))
+  "Retrieves from the RTM user info the list with id equal to active-listid."
+  (rtm::find-by-id (get-active-list-id self) (rtm:get-task-lists-list)))
+
+(defmethod set-active-list ((self rtm) (list rtm:task-list))
+  (setf (get-active-list-id self) (rtm:get-id list)))
 
 (objc:defmethod #/requestAuth ((self rtm))
   (declare (ignore self))
@@ -104,7 +112,7 @@
   (let ((output (make-nsstring (proceed-with-authorization))))
     (setf (rtm-user-info self) (rtm:init-rtm))
     (with-connectivity
-	(rtm:refresh-rtm))
+	(rtm:refresh-rtm :exclude-completed t))
     output))
 
 (defconstant SETTINGS-FILE-NAME "rtm-data.txt")
@@ -124,6 +132,7 @@
     (make-lisp-string (#/resourcePath main-bundle))))
 
 (defun save-app-data (rtm-instance)
+  (declare (special rtm:*rtm-user-info*))
   (let ((rtm-data rtm:*rtm-user-info*)
 	(data-pathname (get-settings-file-name)))
     ;; compile lisp file with data object contents
@@ -132,10 +141,9 @@
     (setf (rtm-user-info rtm-instance) rtm-data)))
 
 (objc:defmethod (#/fetchData :void) ((self rtm))
-  (declare (special *currently-selected-task-list*))
   ;; initialize rtm instance
   (rtm:init-rtm)
-  (handler-case (rtm:refresh-rtm)
+  (handler-case (rtm:refresh-rtm :exclude-completed t)
     (error (condition)
       (gui::alert-window :title "MilkPack Network Error"
 			 :message (format nil "You are not online, please reconnect and relaunch MilkPack. Error: ~a" condition))))
@@ -153,26 +161,24 @@
 	(#/fetchData self)))))
 
 
-(defun get-current-tasks (&key refresh-from-server)
-  (declare (special *currently-selected-task-list*))
-  (when *currently-selected-task-list*
+(defmethod get-current-tasks ((self rtm) &key refresh-from-server)
+  (when (get-active-list self)
     (when (or refresh-from-server ;; TODO: check this for true offline work
-	      (null (rtm:get-tasks *currently-selected-task-list*))) ;; otherwise work faster, from memory
-      (rtm:rtm-refresh-list *currently-selected-task-list*))
-    (filter (lambda (x) (string= "" (rtm:get-completed x)))
-	    (rtm:get-tasks *currently-selected-task-list*))))
+	      (null (rtm:get-tasks (get-active-list self)))) ;; otherwise work faster, from memory
+      (rtm:rtm-refresh-list (get-active-list self) :exclude-completed t))
+    (rtm:get-tasks (get-active-list self))))
 
 
-(defun sort-and-filter-tasklist (tasklist)
+(defun sort-tasklist (tasklist)
   (setf (rtm:get-tasks tasklist)
 	(sort-tasks (rtm:get-tasks tasklist))))
 
-(defun update-current-tasklist (&key refresh-from-server)
-  (declare (special *currently-selected-task-list*))
+(defmethod update-current-tasklist ((self rtm) &key refresh-from-server)
   (when refresh-from-server
-    (setf (rtm:get-tasks *currently-selected-task-list*)
-	  (get-current-tasks :refresh-from-server t)))
-  (sort-and-filter-tasklist *currently-selected-task-list*))
+    (setf (rtm:get-tasks (get-active-list self))
+	  (get-current-tasks self :refresh-from-server t)))
+  (sort-tasklist (get-active-list self))
+  (save-app-data self))
 
 (defun sort-tasks (tasks)
   (let (pri1 pri2 pri3 priN)

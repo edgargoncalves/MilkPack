@@ -7,7 +7,8 @@
 (defclass sidebar-custom-cell (ns:ns-text-field-cell)
   ((image      :foreign-type :id :accessor image)
    (badge      :foreign-type :id :accessor badge)
-   (badge-count :accessor badge-count :initform :badge-count))
+   (badge-count :accessor badge-count :initarg :badge-count)
+   (image-size  :accessor image-size  :initform nil))
   (:metaclass ns:+ns-object))
 
 
@@ -54,11 +55,21 @@
   (call-next-method cell-frame control-view))
 
 (objc:defmethod (#/cellSize :<NSS>ize) ((self sidebar-custom-cell))
-  (let ((cell-size (call-next-method)))
-    (incf (ns:ns-size-width cell-size) (+ (if (%null-ptr-p (image self))
-					      0
-					      (ns:ns-size-width (image self)))
-					  5))
+  (let* ((cell-size (call-next-method))
+	 (image (image self))
+	 (image-size (image-size self))
+	 (image-width (cond ((%null-ptr-p image)
+			     0)
+			    (image-size 
+			     (ns:ns-size-width image-size))
+			    ((typep image 'ns:ns-image)
+			     (unless image-size
+			       (setf (image-size self) (#/size image)))
+			     (ns:ns-size-width image-size))
+			    (t
+			     (error "image is something weird...")))))
+    (incf (ns:ns-size-width cell-size)
+	  (+ image-width 5))
     cell-size))
 
 

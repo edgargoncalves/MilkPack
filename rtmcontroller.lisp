@@ -128,41 +128,39 @@
 ;;; Task menu actions
 
 (defmacro make-task-ibaction (name rtm-operation)
-`(def-ibaction ,name rtm-controller
-   (declare (special *currently-selected-task* *currently-selected-task-list*))
-   (when (and *currently-selected-task-list* *currently-selected-task*)
-     (let* ((rtmi (rtm-instance self))
-	    (taskstableview (tasks-table-view (tasklist-controller self))))
-       ;; operate on the task
-       (,rtm-operation *currently-selected-task*)
-       ;; redraw current task list again, with no selected task:
-       (update-current-tasklist)
-       (update-taskview-for-list *currently-selected-task-list*)
-       (#/reloadData taskstableview)
-       (save-app-data rtmi)))))
+  `(def-ibaction ,name rtm-controller
+     (let ((rtmi (rtm-instance self)))
+       (when (and (get-active-list rtmi)
+		  *currently-selected-task*)
+	 ;; operate on the task
+	 (,rtm-operation *currently-selected-task*)
+	 ;; redraw current task list again, with no selected task:
+	 (update-current-tasklist rtmi)
+	 (update-taskview-for-list (get-active-list rtmi))
+	 (save-app-data rtmi)))))
 
 (make-task-ibaction #/deleteTask:   rtm:rtm-delete-task)
 (make-task-ibaction #/completeTask: rtm:rtm-complete-task)
 (make-task-ibaction #/postponeTask: rtm:rtm-postpone-task)
 
 (def-ibaction #/addTask: rtm-controller
-  (declare (special *currently-selected-task-list*))
   (let ((rtmi (rtm-instance self))
 	(name (#/stringValue (new-task-text-view self))))
     ;; add the task
-    (rtm:rtm-add-task *currently-selected-task-list* (make-lisp-string name) t)
+    (rtm:rtm-add-task (get-active-list rtmi) (make-lisp-string name) t)
     ;; cleanup field
     (#/setStringValue: (new-task-text-view self) #@"")
-    ;; redraw current task list to include the new one.
-    (update-current-tasklist)
-    (#/reloadData (tasks-table-view (tasklist-controller self)))
+    ;; redraw current task list to include the new one (if we're not on a smart list):
+    (unless (rtm:is-smart (get-active-list rtmi))
+      (update-current-tasklist rtmi)
+      (#/reloadData (tasks-table-view (tasklist-controller self))))
+    (redraw-sidepanel-counts)
     (save-app-data rtmi)))
 
 (def-ibaction #/deleteList: rtm-controller
-  (declare (special *currently-selected-task-list*))
-  (when *currently-selected-task-list*
-    (let ((rtmi (rtm-instance *rtm-controller*)))
-      (rtm::rtm-delete-task-list *currently-selected-task-list*)
+  (let ((rtmi (rtm-instance *rtm-controller*)))
+    (when (get-active-list rtmi)
+      (rtm::rtm-delete-task-list (get-active-list rtmi))
       (redraw-sidepanel) ;; fast operation
       (setf (rtm-user-info rtmi) rtm::*rtm-user-info*)
       (save-app-data rtmi))))
