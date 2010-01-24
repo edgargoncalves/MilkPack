@@ -16,7 +16,7 @@
 	(name   (make-lisp-string (#/stringValue (name-text-view self))))
 	(filter (make-lisp-string (#/stringValue (search-text-view self)))))
     ;; add the list
-    (rtm::rtm-add-task-list name (unless (string= "" filter) filter))
+    (rtm::rtm-add-task-list name (unless (string= "" filter) filter) :offline nil) ;; for now, don't run it offline. TODO - fix this, order lists properly.
     ;; hide nib
     (#/orderOut: (#/window self) +null-ptr+)
     ;; cleanup fields

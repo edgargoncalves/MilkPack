@@ -19,6 +19,8 @@
    (list-text-view     :foreign-type :id :accessor list-text-view)
    (map-view           :foreign-type :id :accessor map-view)
    (map-link           :accessor map-link)
+   (notes-table-view   :foreign-type :id :accessor notes-table-view)
+   (note-text-view     :foreign-type :id :accessor note-text-view)
    
    (rtm-instance       :foreign-type :id :accessor rtm-instance :initarg :rtm))
   (:metaclass ns:+ns-object))
@@ -78,7 +80,8 @@
 					  (#/release image)))
 				      (#/setImage: view (#/imageNamed: (find-class 'ns:ns-image) #@"globe.png"))))
 		  :default-value nil ;; to detect there were no location and load a generic globe icon
-		  :handler-fn (lambda (x) (rtm:get-location-image-url x :zoom 15 :maptype "hybrid" :width 203 :height 119)))))
+		  :handler-fn (lambda (x) (rtm:get-location-image-url x :zoom 15 :maptype "hybrid" :width 203 :height 119)))
+    (#/reloadData (notes-table-view self))))
 
 
 (defmethod fixDueDateEnabling ((self task-details-controller) desired-state)
@@ -155,9 +158,74 @@
       (#/reloadData tableview))
     (save-app-data rtmi)))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; Notes list.
+
+;; Interface for the datasource of the tableview:
+(objc:defmethod #/tableView:objectValueForTableColumn:row:
+    ((self task-details-controller) table-view column (row :<NSI>nteger))
+  (declare (special *currently-selected-task*))
+  (when (rtm:get-contents *currently-selected-task*)
+  (flet ((compute-column-value (columns-selectors-alist table-contents &optional selected)
+	   (let* ((column-id (make-lisp-string (#/identifier column)))
+		  (selector-entry (cdr (assoc column-id
+					      columns-selectors-alist
+					      :test #'string=)))
+		  (selector (if (listp selector-entry)
+				(first selector-entry)
+				selector-entry))
+		  (transformer (if (listp selector-entry)
+				   (second selector-entry)
+				   #'make-nsstring)))
+	     (awhen (or selected (nth row table-contents))
+		    (funcall transformer (funcall selector it))))))
+    
+    (cond ((eql table-view (notes-table-view self))
+	   (let* ((notes-list (rtm:get-notes *currently-selected-task*))
+		  (sel-note (nth row notes-list))
+		  (note-title (rtm:get-title sel-note))
+		  (title (if (string= "" note-title) "<untitled>" note-title)))
+	     (aif (%null-ptr-p  (#/identifier column))
+		  (make-nsstring title)
+		  (compute-column-value
+		    `(("title"    . rtm:get-title)
+		      ("modified" . (rtm:get-modified
+				     ,(lambda (x)
+					 (make-nsstring
+					  (format nil "~a" (car (split-sequence:split-sequence #\T x))))))))
+		    notes-list
+		    sel-note))))
+	  (t #@"Nothing")))))
+
+(objc:defmethod (#/numberOfRowsInTableView: :<NSI>nteger)
+    ((self task-details-controller) table-view)
+  (declare (special *currently-selected-task*))
+  (if (and (not (or (null (rtm-instance self))
+		    (%null-ptr-p (rtm-instance self))
+		    (null (rtm-user-info (rtm-instance self)))
+		    (null *currently-selected-task*)))
+	   (eql table-view (notes-table-view self)))
+      (length (rtm:get-notes *currently-selected-task*))
+      0))
+
+
+(objc:defmethod (#/tableViewSelectionDidChange: :void)
+    ((self task-details-controller) notification)
+  (declare (special *currently-selected-task*))
+  ;; Note, this method works for single selections only, for now.
+  (let* ((changed-table (#/object notification)))
+    (cond ((eql changed-table (notes-table-view self))
+	   (awhen (get-table-view-selected-item changed-table (rtm:get-notes *currently-selected-task*))
+	     ;; update note contents view:
+	     (let* ((view (note-text-view self))
+		    (note-contents (rtm:get-contents it))
+		    (contents (make-nsstring (if (string= "" note-contents) "<empty note>" note-contents))))
+	       (#/setString: view contents)))))))
+
+
 
 #|
-Copyright 2009 Edgar Gonçalves
+Copyright 2009, 2010 Edgar Gonçalves
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
