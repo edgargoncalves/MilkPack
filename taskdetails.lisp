@@ -165,37 +165,16 @@
 (objc:defmethod #/tableView:objectValueForTableColumn:row:
     ((self task-details-controller) table-view column (row :<NSI>nteger))
   (declare (special *currently-selected-task*))
-  (when (rtm:get-contents *currently-selected-task*)
-  (flet ((compute-column-value (columns-selectors-alist table-contents &optional selected)
-	   (let* ((column-id (make-lisp-string (#/identifier column)))
-		  (selector-entry (cdr (assoc column-id
-					      columns-selectors-alist
-					      :test #'string=)))
-		  (selector (if (listp selector-entry)
-				(first selector-entry)
-				selector-entry))
-		  (transformer (if (listp selector-entry)
-				   (second selector-entry)
-				   #'make-nsstring)))
-	     (awhen (or selected (nth row table-contents))
-		    (funcall transformer (funcall selector it))))))
-    
-    (cond ((eql table-view (notes-table-view self))
-	   (let* ((notes-list (rtm:get-notes *currently-selected-task*))
-		  (sel-note (nth row notes-list))
-		  (note-title (rtm:get-title sel-note))
-		  (title (if (string= "" note-title) "<untitled>" note-title)))
-	     (aif (%null-ptr-p  (#/identifier column))
-		  (make-nsstring title)
-		  (compute-column-value
-		    `(("title"    . rtm:get-title)
-		      ("modified" . (rtm:get-modified
-				     ,(lambda (x)
-					 (make-nsstring
-					  (format nil "~a" (car (split-sequence:split-sequence #\T x))))))))
-		    notes-list
-		    sel-note))))
-	  (t #@"Nothing")))))
+  (declare (ignore column))
+  (when *currently-selected-task*
+    (if (eql table-view (notes-table-view self))
+	(let* ((notes-list (rtm:get-notes *currently-selected-task*))
+	       (sel-note (nth row notes-list)))
+	  (let* ((note-title (rtm:get-title sel-note))
+		 (title (if (string= "" note-title) "<untitled>" note-title)))
+	    (make-nsstring title)))
+	#@"Nothing")))
+
 
 (objc:defmethod (#/numberOfRowsInTableView: :<NSI>nteger)
     ((self task-details-controller) table-view)
@@ -222,6 +201,35 @@
 		    (contents (make-nsstring (if (string= "" note-contents) "<empty note>" note-contents))))
 	       (#/setString: view contents)))))))
 
+
+(defmethod reload-notes ((self task-details-controller))
+  (declare (special *currently-selected-task*))
+  (#/reloadData (notes-table-view self)))
+
+(def-ibaction #/addNote: task-details-controller
+  (declare (special *currently-selected-task*))
+  (when *currently-selected-task*
+    (rtm:rtm-add-note-to-task *currently-selected-task* "<untitled>" "<empty note>")
+    (reload-notes self)))
+
+(def-ibaction #/deleteNote: task-details-controller
+  (declare (special *currently-selected-task*))
+  (when *currently-selected-task*
+    (awhen (get-table-view-selected-item (notes-table-view self) (rtm:get-notes *currently-selected-task*))
+      (rtm:rtm-delete-note it)
+      (format t "---> note id: ~s~%~%" (rtm:get-id it))
+      (#/setString: (note-text-view self) #@"")
+      (reload-notes self))))
+
+(def-ibaction #/saveNote: task-details-controller
+  (declare (special *currently-selected-task*))
+  (when *currently-selected-task*
+    (awhen (get-table-view-selected-item (notes-table-view self) (rtm:get-notes *currently-selected-task*))
+      (rtm:rtm-edit-note it (rtm:get-title it) (make-lisp-string (#/string (#/textStorage (note-text-view self))))))))
+
+;;TODO: place edited tasks on bold/italique
+;;TODO: disable save/- buttons when a note isn't selected. enable when they are.
+;;TODO: enable save button only when text is changed.
 
 
 #|

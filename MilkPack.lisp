@@ -5,6 +5,8 @@
 ;;
 ;; press Shift-Apple-E to evaluate the entire file. wait for the IDE to close.
 
+;; Alternatively, run the makefile in this directory with GNU Make.
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Package initialization
 (require :cocoa)
@@ -65,7 +67,7 @@
 ;;; Code to build the MilkPack application bundle in MacOS:
 
 (setf (current-directory) PROJECT-SOURCE-PATH)
-(require "build-application")
+(require :build-application)
 
 
 (ccl::build-application
