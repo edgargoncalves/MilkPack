@@ -12,9 +12,9 @@
 		</object>
 		<object class="NSMutableArray" key="IBDocument.EditedObjectIDs">
 			<bool key="EncodedWithXMLCoder">YES</bool>
-			<integer value="406"/>
 			<integer value="29"/>
-			<integer value="857"/>
+			<integer value="1154"/>
+			<integer value="367"/>
 			<integer value="1070"/>
 		</object>
 		<object class="NSArray" key="IBDocument.PluginDependencies">
@@ -1582,7 +1582,7 @@
 																</object>
 																<object class="NSTableColumn" id="120241211">
 																	<string key="NSIdentifier">description</string>
-																	<double key="NSWidth">318</double>
+																	<double key="NSWidth">325</double>
 																	<double key="NSMinWidth">100</double>
 																	<double key="NSMaxWidth">1000</double>
 																	<object class="NSTableHeaderCell" key="NSHeaderCell">
@@ -1612,7 +1612,7 @@
 																</object>
 																<object class="NSTableColumn" id="214604681">
 																	<string key="NSIdentifier">tags</string>
-																	<double key="NSWidth">157</double>
+																	<double key="NSWidth">150</double>
 																	<double key="NSMinWidth">150</double>
 																	<double key="NSMaxWidth">250</double>
 																	<object class="NSTableHeaderCell" key="NSHeaderCell">
@@ -1824,6 +1824,7 @@
 				<string key="NSScreenRect">{{0, 0}, {1440, 878}}</string>
 				<string key="NSMinSize">{565, 280}</string>
 				<string key="NSMaxSize">{1.79769e+308, 1.79769e+308}</string>
+				<string key="NSFrameAutosaveName">milkpackwindow</string>
 			</object>
 			<object class="NSMenu" id="731560108">
 				<string key="NSTitle">Popup</string>
@@ -3205,7 +3206,7 @@ AQABAAEAAQAB//+dkAEA//+PgAAE//+dkAEI//+dkAEMUERUAFBTVABQV1QAUFBUAAAAAAEAAAABA</b
 																<int key="NSTCFlags">1</int>
 															</object>
 															<object class="NSTextViewSharedData" key="NSSharedData">
-																<int key="NSFlags">12263</int>
+																<int key="NSFlags">100675555</int>
 																<int key="NSTextCheckingTypes">0</int>
 																<nil key="NSMarkedAttributes"/>
 																<reference key="NSBackgroundColor" ref="8521881"/>
@@ -7642,9 +7643,9 @@ AQABAAEAAQAB//+dkAEA//+PgAAE//+dkAEI//+dkAEMUERUAFBTVABQV1QAUFBUAAAAAAEAAAABA</b
 					<string>{{452, 793}, {234, 43}}</string>
 					<string>com.apple.InterfaceBuilder.CocoaPlugin</string>
 					<string>com.apple.InterfaceBuilder.CocoaPlugin</string>
-					<string>{{584, 159}, {800, 589}}</string>
+					<string>{{565, 131}, {800, 589}}</string>
 					<string>com.apple.InterfaceBuilder.CocoaPlugin</string>
-					<string>{{584, 159}, {800, 589}}</string>
+					<string>{{565, 131}, {800, 589}}</string>
 					<integer value="1"/>
 					<string>{{329, 71}, {747, 633}}</string>
 					<boolean value="YES"/>
@@ -7763,9 +7764,9 @@ AQABAAEAAQAB//+dkAEA//+PgAAE//+dkAEI//+dkAEMUERUAFBTVABQV1QAUFBUAAAAAAEAAAABA</b
 					<string>com.apple.InterfaceBuilder.CocoaPlugin</string>
 					<string>com.apple.InterfaceBuilder.CocoaPlugin</string>
 					<string>com.apple.InterfaceBuilder.CocoaPlugin</string>
-					<string>{{535, 194}, {481, 610}}</string>
+					<string>{{871, 113}, {481, 610}}</string>
 					<string>com.apple.InterfaceBuilder.CocoaPlugin</string>
-					<string>{{535, 194}, {481, 610}}</string>
+					<string>{{871, 113}, {481, 610}}</string>
 					<boolean value="NO"/>
 					<boolean value="YES"/>
 					<boolean value="YES"/>
