@@ -31,6 +31,10 @@ To build the final application, until I make a nice script for it, you can execu
 
 and press Shift-Apple-E to evaluate the entire file. wait for the IDE to close. Replace paths as approapriate, and don't forget to change the path defconstant form in MilkPack.lisp, too.
 
+And as of now, you can also just use "make" on a shell, the included
+Makefile will take care of everything compile and path-related for you (assuming you have a
+$CCL environment variable properly set). You still need to read
+MilkPack.lisp for instructions about the API key.
 
 Has MilkPack got any long term plans?
 -------------------------------------
