@@ -40,12 +40,41 @@
   (let ((domain (#/standardUserDefaults ns:ns-user-defaults)))
     (make-lisp-string (#/stringForKey: domain key))))
 
+;; KVC syntactic sugar ftw!! :d 
+(defmacro make-kvc-entity (class getter setter slot &optional (type :id))
+  "Use `MAKE-KVC-ENTITY' to create the right objective c methods for single entity bindings to work well."
+  `(progn
+     (objc:defmethod (,setter :void) ((self ,class) (a ,type))
+       (unless (eq (slot-value self ',slot) a)
+	 (setf (slot-value self ',slot) a)))
+     
+     (objc:defmethod (,getter ,type) ((self ,class))
+       (slot-value self ',slot))))
+
+(defmacro make-kvc-array (class getter setter slot &optional (type :id))
+  "Use `MAKE-KVC-ARRAY' to create the right objective c methods for array bindings to work well."
+  `(progn
+     (objc:defmethod (,setter :void) ((self ,class) (a ,type))
+       (unless (eq (slot-value self ',slot) a)
+	 (#/retain a)
+	 (#/release (slot-value self ',slot))
+	 (setf (slot-value self ',slot) a)))
+     (objc:defmethod (,getter ,type) ((self ,class))
+       (slot-value self ',slot))))
+
 
 (defun convert-list-to-nsarray (list &optional (elt-handler #'make-nsstring))
   (let ((array (#/array ns:ns-mutable-array)))
     (dolist (elt list)
       (#/addObject: array (funcall elt-handler elt)))
     array))
+
+(defmethod find-in-nsarray ((array ns:ns-array) value &key (test #'equal) (key #'identity))
+  (dotimes (i (#/count array))
+    (let ((obj (#/objectAtIndex: array i)))
+      (when (funcall test value (funcall key obj))
+	(return obj)))))
+
 
 
 (defmacro def-ibaction (name controller-name &body body)

@@ -64,11 +64,11 @@
 	<key>CFBundleHelpBookFolder</key>
 	<string>Help</string>
 	<key>CFBundleHelpBookName</key>
-	<string>OpenMCL Help</string>
+	<string>MilkPack Help</string>
 	<key>CFBundleIconFile</key>
 	<string>iMeuh-big-icon.icns</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.clozure.Clozure CL-x8664</string>
+	<string>com.edgargoncalves.MilkPack</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -78,7 +78,7 @@
 	<key>CFBundleSignature</key>
 	<string>OMCL</string>
 	<key>CFBundleVersion</key>
-	<string>13098M (X8664)</string>
+	<string>0.7a</string>
 	<key>NSMainNibFile</key>
 	<string>MilkPack</string>
 	<key>NSPrincipalClass</key>

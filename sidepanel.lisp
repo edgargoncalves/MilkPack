@@ -88,6 +88,7 @@
     (dolist (group *sidetree-lists*) ;; group is of type task-list-sidebar-group.
       (let ((group-name (name group))
 	    (lists (lists group)))
+	;;TODO: use KVC on rtm object here:
 	(#/setObject:forKey: dict
 			     (convert-list-to-nsarray
 			      lists
@@ -265,6 +266,7 @@
 (defun update-taskview-for-list (list)
   (declare (special *rtm-controller*))
   (set-active-list (rtm-instance *rtm-controller*) list)
+  (update-current-tasklist (rtm-instance *rtm-controller*) :refresh-from-server nil)
   (let ((view (tasks-table-view (tasklist-controller *rtm-controller*))))
     ;; remove the selection:
     (#/deselectAll: view nil)

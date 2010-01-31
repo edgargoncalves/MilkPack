@@ -91,6 +91,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; make highlight color look like rtm's. make the user feel at home.
 
+;; on Interface Builder, make the task list be of TaskListTableView.
+
 (defclass tasklist-table-view (ns:ns-table-view)
    ()
   (:metaclass ns:+ns-object))
@@ -98,7 +100,6 @@
 
 (objc:defmethod #/_highlightColorForCell: ((self tasklist-table-view) cell)
   (declare (ignore cell))
-
   (#/colorWithDeviceRed:green:blue:alpha: ns:ns-color 1 1 0.8 1.0))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

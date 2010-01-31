@@ -10,20 +10,25 @@
    (priority-text-view :foreign-type :id :accessor priority-text-view)
    (tags-token-view    :foreign-type :id :accessor tags-token-view)
    (link-text-view     :foreign-type :id :accessor link-text-view)
-   (location-text-view :foreign-type :id :accessor location-text-view)
+   ;; (location-text-view :foreign-type :id :accessor location-text-view)
+   (location-selected      :foreign-type :id :accessor location-selected)
    (created-date-view  :foreign-type :id :accessor created-date-view)
    (modified-date-view :foreign-type :id :accessor modified-date-view)
    (due-date-view      :foreign-type :id :accessor due-date-view)
    (is-due-view        :foreign-type :id :accessor is-due-view)
    (estimate-text-view :foreign-type :id :accessor estimate-text-view)
    (list-text-view     :foreign-type :id :accessor list-text-view)
+   (list-selected      :foreign-type :id :accessor list-selected)
    (map-view           :foreign-type :id :accessor map-view)
-   (map-link           :accessor map-link)
    (notes-table-view   :foreign-type :id :accessor notes-table-view)
    (note-text-view     :foreign-type :id :accessor note-text-view)
-   
    (rtm-instance       :foreign-type :id :accessor rtm-instance :initarg :rtm))
   (:metaclass ns:+ns-object))
+
+
+(make-kvc-entity task-details-controller #/listSelected     #/setListSelected:     list-selected)
+(make-kvc-entity task-details-controller #/locationSelected #/setLocationSelected: location-selected)
+
 
 ;; (objc:defmethod #/init ((self task-details-controller))
 ;;   (call-next-method)
@@ -64,23 +69,28 @@
     (handle-value rtm:get-tags
 		  tags-token-view
 		  :handler-fn (lambda (x) (make-nsstring (format nil "~{~a~^, ~}" (if (stringp (car x)) x (car x))))))
-    (handle-value rtm:get-list
-		  list-text-view
-		  :handler-fn (lambda (x) (make-nsstring (rtm:get-name x))))
-    (handle-value rtm:get-location
-		  location-text-view
-		  :handler-fn (lambda (x) (make-nsstring  (rtm:get-name x))))
-    (handle-value rtm:get-location
-		  map-view
-		  :view-changer (lambda (view url)
-				  (if url
-				      (let* ((image (#/initWithContentsOfURL: (#/alloc ns:ns-image) (url-from-string url))))
-					(when image
-					  (#/setImage: view image)
-					  (#/release image)))
-				      (#/setImage: view (#/imageNamed: (find-class 'ns:ns-image) #@"globe.png"))))
-		  :default-value nil ;; to detect there were no location and load a generic globe icon
-		  :handler-fn (lambda (x) (rtm:get-location-image-url x :zoom 15 :maptype "hybrid" :width 203 :height 119)))
+
+    ;; TODO review if this is working:
+    ;;TODO: try to save a list change, check website
+    ;; TODO: remove the textbox from both the code and the IB
+    (let* ((combo-items (non-smart-task-lists (rtm-instance *rtm-controller*)))
+	   (rtmlist (rtm:get-list task))
+	   (right-list (find-in-nsarray combo-items (make-nsstring (rtm:get-name rtmlist))
+					:test #'#/isEqualToString:
+					:key #'name)))
+      (#/setListSelected: self right-list))
+
+    (let ((combo-items (locations (rtm-instance *rtm-controller*)))
+	   (rtmlocation (rtm:get-location task)))
+      (if rtmlocation
+	(let ((loc (find-in-nsarray combo-items (make-nsstring (rtm:get-name rtmlocation))
+					 :test #'#/isEqualToString:
+					 :key #'#/name)))
+	  (#/setLocationSelected: self loc))
+	(progn
+	  ;; set popup list to no value, and set the image to a default image:
+	  (#/setLocationSelected: self +null-ptr+)
+	  (#/setImage: (map-view self) (#/imageNamed: (find-class 'ns:ns-image) #@"globe.png")))))    
     (#/reloadData (notes-table-view self))))
 
 
@@ -121,25 +131,34 @@
 (def-ibaction #/saveTask: task-details-controller
   ;; this method adds a task, then closes itself.
   (declare (special *currently-selected-task*))
-  (macrolet ((save-field (field-selector rtm-selector &key (when t)
+  (macrolet ((save-field (field-selector rtm-selector &key
 					 (value-extractor '(lambda (x) (make-lisp-string (#/stringValue x)))))
 	       `(let ((x (funcall #',value-extractor (funcall #',field-selector self))))
-		  (when ,when ;;TODO - don't call this if the value is the same as the one we're trying to set.
-		    (funcall #',rtm-selector *currently-selected-task* x)))))
+		  (funcall #',rtm-selector *currently-selected-task* x))))
     ;; loop for the properties and do the rtm change operation on them.
-    ;; TODO: combo boxes.
     (save-field name-text-view     rtm:rtm-change-task-name)
     (save-field estimate-text-view rtm:rtm-change-task-estimate)
-    (save-field location-text-view rtm:rtm-change-task-location)
     (save-field link-text-view     rtm:rtm-change-task-url)
+
+    (unless (%null-ptr-p (#/locationSelected self))
+      (save-field #/locationSelected
+		  rtm:rtm-change-task-location
+		  :value-extractor rtm-location))
+
+    (unless (%null-ptr-p (#/listSelected self))
+      (save-field #/listSelected
+		  rtm:rtm-move-task-to-list
+		  :value-extractor rtm-task-list))
+    
+
     (let ((has-due-p (< 0 (#/state (is-due-view self)))))
-    (save-field due-date-view
-		(lambda (task x)
-		   (rtm:rtm-change-task-due-date task (if has-due-p x "")))
-		:value-extractor (lambda (x)
-				   (let ((out-formatter (make-instance 'ns:ns-date-formatter)))
-				     (#/setDateFormat: out-formatter #@"YYYY-MM-dd'T'HH:mm:ss")
-				     (make-lisp-string (#/stringFromDate: out-formatter (#/dateValue x)))))))
+      (save-field due-date-view
+		  (lambda (task x)
+		    (rtm:rtm-change-task-due-date task (if has-due-p x "")))
+		  :value-extractor (lambda (x)
+				     (let ((out-formatter (make-instance 'ns:ns-date-formatter)))
+				       (#/setDateFormat: out-formatter #@"YYYY-MM-dd'T'HH:mm:ss")
+				       (make-lisp-string (#/stringFromDate: out-formatter (#/dateValue x)))))))
     (save-field priority-text-view rtm:rtm-change-task-priority
 		:value-extractor (lambda (x) (make-lisp-string (#/labelForSegment: x (#/selectedSegment x)))))
     (save-field tags-token-view    rtm:rtm-change-task-tags))
@@ -148,14 +167,16 @@
 
 (defmethod hide-window ((self task-details-controller))
   (declare (special *rtm-controller*))
-  ;; hide nib
-  (#/orderOut: (#/window self) +null-ptr+)
   ;; redraw current task list again:
   (let ((rtmi (rtm-instance *rtm-controller*)))
     (update-current-tasklist rtmi)
     (let ((tableview (tasks-table-view (tasklist-controller *rtm-controller*))))
       (#/deselectAll: tableview nil)
       (#/reloadData tableview))
+    (redraw-sidepanel-counts)
+    ;; hide nib
+    (#/orderOut: (#/window self) +null-ptr+)
+    ;; let the user see his tasks, and save our internal state.
     (save-app-data rtmi)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -187,7 +208,16 @@
       (length (rtm:get-notes *currently-selected-task*))
       0))
 
+;;; to rename a note:
+(objc:defmethod (#/tableView:setObjectValue:forTableColumn:row: :void)
+    ((self task-details-controller) table-view object column row)
+  (declare (ignore column row))
+  (declare (special *currently-selected-task*))
+  (let ((note (get-table-view-selected-item table-view (rtm:get-notes *currently-selected-task*)))
+	(new-title (make-lisp-string object)))
+    (rtm:rtm-edit-note note new-title (get-contents note))))
 
+;;; to select a note:
 (objc:defmethod (#/tableViewSelectionDidChange: :void)
     ((self task-details-controller) notification)
   (declare (special *currently-selected-task*))
@@ -200,6 +230,8 @@
 		    (note-contents (rtm:get-contents it))
 		    (contents (make-nsstring (if (string= "" note-contents) "<empty note>" note-contents))))
 	       (#/setString: view contents)))))))
+
+
 
 
 (defmethod reload-notes ((self task-details-controller))
@@ -217,7 +249,6 @@
   (when *currently-selected-task*
     (awhen (get-table-view-selected-item (notes-table-view self) (rtm:get-notes *currently-selected-task*))
       (rtm:rtm-delete-note it)
-      (format t "---> note id: ~s~%~%" (rtm:get-id it))
       (#/setString: (note-text-view self) #@"")
       (reload-notes self))))
 

@@ -92,8 +92,37 @@
 
 (defclass rtm (ns:ns-object)
   ((user-info      :initform nil :accessor rtm-user-info)
-   (active-list-id :initform ""  :accessor get-active-list-id))
+   (active-list-id :initform ""  :accessor get-active-list-id)
+   (task-lists     :foreign-type :id :accessor task-lists) ;; for use within combo boxes, for now.
+   (locations     :foreign-type :id :accessor locations) ;; for use within combo boxes, for now.
+   (non-smart-task-lists     :foreign-type :id :accessor non-smart-task-lists)) ;; for use within combo boxes, for now.
   (:metaclass ns:+ns-object))
+
+(defclass nstasklist (ns:ns-object)
+  ((name :foreign-type :id :accessor name)
+   (is-smart :foreign-type :id :accessor is-smart)
+   (rtm-task-list :initform nil :accessor rtm-task-list))
+  (:metaclass ns:+ns-object))
+
+(make-kvc-entity nstasklist #/name              #/setName:              name)
+(make-kvc-entity nstasklist #/isSmart           #/setIsSmart:           is-smart :<BOOL>)
+
+(make-kvc-array  rtm        #/taskLists         #/setTaskLists:         task-lists)
+(make-kvc-array  rtm        #/nonSmartTaskLists #/setNonSmartTaskLists: non-smart-task-lists)
+
+(defclass nslocation (ns:ns-object)
+  ((name         :foreign-type :id :accessor name)
+   (image        :foreign-type :id :accessor image)
+   (image-url    :foreign-type :id :accessor image-url)
+   (rtm-location :initform nil     :accessor rtm-location))
+  (:metaclass ns:+ns-object))
+
+(make-kvc-entity nslocation #/name      #/setName:      name)
+(make-kvc-entity nslocation #/image     #/setImage:     image)
+(make-kvc-entity nslocation #/imageUrl  #/setImageUrl:  image-url)
+(make-kvc-array  rtm        #/locations #/setLocations: locations)
+
+
 
 (defmethod get-active-list ((self rtm))
   "Retrieves from the RTM user info the list with id equal to active-listid."
@@ -108,9 +137,46 @@
   ;; TODO: disable the button. enable the proceed button.
   (make-nsstring (proceed-with-authorization)))
 
+
+(defmethod update-rtm ((self rtm) contents)
+  "updates the internal state of the application. can be used to update other state ramifications."
+  (setf (rtm-user-info self) contents)
+  ;; updates tasklists:
+  (flet ((tasklists () (mapcar (lambda (rtm-tasklist)
+				 (let ((list (make-instance 'nstasklist)))
+				   (#/setName:    list  (make-nsstring (rtm:get-name rtm-tasklist)))
+				   (#/setIsSmart: list  (if (rtm:is-smart rtm-tasklist) #$YES #$NO))
+				   (setf (rtm-task-list list) rtm-tasklist)
+				   list))
+			       (rtm:get-task-lists contents)))
+	 (locations () (mapcar (lambda (rtm-location)
+				 (let* ((location (make-instance 'nslocation))
+					(url (url-from-string (rtm:get-location-image-url rtm-location
+											  :zoom 15
+											  :maptype "hybrid"
+											  :width 203
+											  :height 119)))
+					(image (#/initWithContentsOfURL: (#/alloc ns:ns-image) url)))
+				   (#/setName:     location (make-nsstring (rtm:get-name rtm-location)))
+				   (#/setImageUrl: location url)
+				   (#/setImage: location image);;TODO: support no graphics locations.		   
+				   (setf (rtm-location location) rtm-location)
+				   location))
+			       (rtm:get-locations contents))))
+    ;;create the nsmutablearrays to be controlled by an nsarraycontroller (each with unique content instances)
+    (#/setTaskLists: self
+		    (convert-list-to-nsarray (tasklists) #'identity))
+    (#/setNonSmartTaskLists: self 
+			   (convert-list-to-nsarray
+			    (filter (lambda (x) (not (rtm:is-smart (rtm-task-list x))))
+				    (tasklists))
+			    #'identity))
+    (#/setLocations: self
+		     (convert-list-to-nsarray (locations) #'identity))))
+
 (objc:defmethod #/proceed ((self rtm))
   (let ((output (make-nsstring (proceed-with-authorization))))
-    (setf (rtm-user-info self) (rtm:init-rtm))
+    (update-rtm self (rtm:init-rtm))
     (with-connectivity
 	(rtm:refresh-rtm :exclude-completed t))
     output))
@@ -131,14 +197,14 @@
   (let* ((main-bundle (#/mainBundle ns:ns-bundle)))
     (make-lisp-string (#/resourcePath main-bundle))))
 
-(defun save-app-data (rtm-instance)
+(defmethod save-app-data ((rtm-instance rtm))
   (declare (special rtm:*rtm-user-info*))
   (let ((rtm-data rtm:*rtm-user-info*)
 	(data-pathname (get-settings-file-name)))
     ;; compile lisp file with data object contents
     (cl-store:store rtm-data data-pathname)
     ;;set internal object
-    (setf (rtm-user-info rtm-instance) rtm-data)))
+    (update-rtm rtm-instance rtm-data)))
 
 (objc:defmethod (#/fetchData :void) ((self rtm))
   ;; initialize rtm instance
@@ -155,8 +221,8 @@
 
     ;;load byte-compiled file and restore the variable contents into rtm-data:
     (handler-case (let ((rtm-data (cl-store:restore data-pathname)))
-		      (setf (rtm-user-info self) rtm-data
-			    rtm:*rtm-user-info* rtm-data))
+		    (update-rtm self rtm-data)
+		    (setf rtm:*rtm-user-info* rtm-data))
       (cl-store:restore-error ()
 	(#/fetchData self)))))
 

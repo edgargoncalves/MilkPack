@@ -1,0 +1,5 @@
+/* Localized versions of Info.plist keys */
+
+CFBundleShortVersionString = "Alpha Version 0.7";
+CFBundleGetInfoString = "MilkPack version 0.7a, Copyright 2009-2010 Edgar Gonçalves.";
+NSHumanReadableCopyright = "Copyright 2009-2010 Edgar Gonçalves.";
